@@ -1,4 +1,4 @@
-[README.md](https://github.com/user-attachments/files/32999925/README.md)
+[README.md](https://github.com/user-attachments/files/33005149/README.md)
 # WikiTree Marathon Drawing
 
 A live-drawing tool for the WikiTree Source-a-Thon livecast. The host pulls winners from WikiTree's Random Participant tool, and the page shows a bib slideshow that slows down and lands on each winner, with a drum roll while it spins and applause when the winner lands. It shows the winner's name, WikiTree ID, team and bib.
@@ -14,14 +14,33 @@ The tool has three screens.
 1. **Setup**
    - Choose **Test** or **Live** at the top. Test mode shows an amber banner on every screen and saves nothing, so use it to practise. Live mode saves the ineligible list.
    - Enter how many winners to draw.
-   - Add any ineligible WikiTree IDs (previous winners who have claimed their prize). Paste IDs one per line or separated by commas, or paste wikitree.com/wiki/... links, then press **Add to list**. Remove an ID with the x on its chip.
+   - Choose **When someone wins** (see below): winners are either added to the ineligible list automatically, or hosts add them by hand after they claim.
+   - Add any other ineligible WikiTree IDs by hand. Paste IDs one per line or separated by commas, or paste wikitree.com/wiki/... links, then press **Add to list**. Remove an ID with the x on its chip.
    - Add the **studio hosts** for this draw (see below).
    - Under **Draw settings** you can choose where winners come from, turn the drum roll and applause on or off, run a **Sound check**, and set the spin length (3 to 20 seconds).
    - Press **Continue**.
 2. **Ready to draw**: press the WikiTree logo to start.
-3. **The draw**: the bibs spin and slow down, then land on the winner. Press **Draw next winner** for each additional winner. After the last one, **Show all winners** gives a summary.
+3. **The draw**: the bibs spin and slow down, then land on the winner. Press **Draw next winner** for each additional winner. After the last one, **Show all winners** gives a summary, **Prize winners table** opens the prize winners screen (below), and **New draw** returns to setup.
 
 A small **Sound on / Sound off** button in the bottom-right corner mutes everything quickly.
+
+## After the draw: the prize winners screen
+
+When the draw is finished, press **Prize winners table**. It opens a screen with:
+
+- A link to the WikiTree **Prize Winners** page: https://www.wikitree.com/wiki/Space:Prize_Winners
+- **WikiTree markup** for this draw's winners, ready to copy with one button. Each winner is a table row in the format of the Current Event Winners table (WikiTree ID, First, Last, Event):
+
+  ```
+  |-
+  |Zurcher-160||Randi||Zurcher||SaTXI
+  ```
+
+- **Rows to add** (the default) gives just the rows. Paste them into the existing table on the Prize Winners page, just above the last line (the `|}` that closes the table). **Whole table** gives a complete Current Event Winners section containing only this draw's winners.
+- An **Event name** box (it starts as SaTXI and is remembered in the browser) fills the Event column. Change it for each marathon.
+- The markup box is editable. First and Last are split from the participant's name automatically, keeping prefixes such as "van der" with the surname. Check them, and fix any by hand, before copying.
+
+**Back to the first screen** returns to setup, ready for the next draw, and clears the studio hosts. **Back to the winners** returns to the winner display.
 
 ## How winners are picked
 
@@ -34,8 +53,17 @@ If the tool cannot be reached, the page says so and offers **Entire eligible ros
 A participant cannot win if any of these is true:
 
 - They have anything in the **Note** column of the participant table. That column is only for members who won in the previous marathon or who are WikiTree team members.
-- A host has added their ID to the **ineligible list** for the weekend.
+- Their ID is on the **ineligible list** for the weekend, either added by a host or added automatically when they won.
 - They are one of the **studio hosts** entered for the current draw.
+
+### When someone wins: two ways
+
+A toggle on the setup screen chooses what happens to each winner.
+
+- **Add winners to the ineligible list automatically** (the default). The moment a winner lands, their ID goes on the ineligible list, so they cannot win again this weekend. Nobody has to wait for a claim. In Live mode the ID is saved to the shared list that every host sees; in Test mode it goes on the test list only. If saving to the shared list fails, a short warning appears under the winner so a host can add the ID by hand. If a draw was a mistake, remove the ID with the x on its chip.
+- **Hosts add winners after they claim.** The original way. Nothing is added automatically, and hosts add each winner to the ineligible list by hand once they have claimed their prize.
+
+The choice is saved in each host's browser, so make sure everyone drawing uses the same one.
 
 ### Studio hosts (this draw only)
 
