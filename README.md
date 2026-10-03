@@ -1,4 +1,4 @@
-[README.md](https://github.com/user-attachments/files/33005584/README.md)
+[README.md](https://github.com/user-attachments/files/33006002/README.md)
 # WikiTree Marathon Drawing
 
 A live-drawing tool for the WikiTree Source-a-Thon livecast. The host pulls winners from WikiTree's Random Participant tool, and the page shows a bib slideshow that slows down and lands on each winner, with a drum roll while it spins and applause when the winner lands. It shows the winner's name, WikiTree ID, team and bib.
@@ -12,6 +12,7 @@ Everything runs in the browser. There is no server to maintain. The only outside
 The tool has three screens.
 
 1. **Setup**
+   - In Live mode, enter the **host code** in the box at the top first (see "The host code" below). Nothing can be drawn or changed until it is accepted.
    - Choose **Test** or **Live** at the top. Test mode shows an amber banner on every screen and saves nothing, so use it to practise. Live mode saves the ineligible list.
    - A summary line at the top shows how many participants are eligible and how many are marked ineligible in the sheet.
    - Enter how many winners to draw.
@@ -78,7 +79,16 @@ The list is stored in an **Ineligible** tab of the participants Google Sheet, th
 
 If the shared list cannot be reached, the page shows a warning and asks for confirmation before a draw, so nobody draws from a stale list by accident.
 
-If a **host code** is set in the script, each host types it once, in the box under the ineligible list.
+### The host code
+
+If a **host code** is set in the script, every host must enter it before using Live mode. A box at the top of the setup screen asks for it.
+
+- Until the code is accepted, Live mode is **locked**: the ineligible list is hidden, IDs cannot be added or removed, and **Continue** and the draw are blocked. There is no "continue anyway".
+- The code is checked by the script, so even a modified page cannot change the list without it.
+- The code is remembered **until the browser tab is closed**. A reload in the same tab keeps it, but opening the page in a new tab, or after closing the tab, asks for it again. It is never saved in the browser's long-term storage. If the script stops accepting a remembered code (for example, after you change it), the page forgets it and asks again. Any code or list saved on a device by an older version is removed.
+- If the code stops being accepted, or the shared list cannot be reached, the draw is stopped before anyone is drawn.
+- Test mode does not need the code. It never reads or changes the shared list.
+- The page can only require a code that the script requires. If `PASSCODE` in the script is empty, nothing is locked.
 
 ## Two codes
 
@@ -86,7 +96,7 @@ The script uses two different passcodes. They must not be the same.
 
 | Code | Who has it | What it allows |
 | --- | --- | --- |
-| **Host code** (`PASSCODE`) | Everyone drawing | Read and edit the ineligible list, and load the participant table. |
+| **Host code** (`PASSCODE`) | Everyone drawing | Read and edit the ineligible list (including the winners added automatically), and load the participant table. Remembered only until the tab is closed. |
 | **Admin code** (`ADMIN_PASSCODE`) | Only the person managing the participant table | Everything above, plus publishing or removing the participant table and clearing the whole ineligible list. |
 
 Both codes are checked by the Google script, not by the page, so neither appears in the page's source. Admin actions are refused until an admin code is set.
@@ -145,7 +155,8 @@ This repository and page are public, so set both codes. Without them anyone who 
 
 | What you see | What to do |
 | --- | --- |
-| "Enter the host code to use the shared list" | Type the host code under the ineligible list and press Enter or **Save code**. The page tells you if it is wrong. |
+| "Enter the host code to use Live mode" | Type the host code in the box at the top of the setup screen and press Enter or **Unlock**. The page tells you if it is wrong. It is remembered until the tab is closed, and has to be entered again in a new tab. |
+| "The draw was stopped because the shared list isn't unlocked" | The code was rejected or the shared list could not be reached when the draw started. Nothing was drawn. Enter the code again, or press **Retry**, and start again. |
 | "Can't reach the shared list" | Check the connection and press **Retry**. The reason is shown in brackets. "Unreadable response" usually means the Apps Script was not deployed with access set to **Anyone**. |
 | Admin says "No admin passcode has been set" | Set `ADMIN_PASSCODE` in the script and deploy a new version. |
 | Admin says the admin passcode must differ from the host code | Change one of the two codes in the script and deploy a new version. |
