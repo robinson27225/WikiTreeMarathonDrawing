@@ -134,6 +134,8 @@ button:focus-visible,a:focus-visible,summary:focus-visible{outline:2px solid #ff
 .synclbl button{padding:0;background:none;color:var(--accent);font-weight:600;text-decoration:underline;border-radius:0;font-size:13px}
 .codeRow{display:flex;gap:10px;flex-wrap:wrap}
 .codeRow input{flex:1 1 160px;width:auto}
+.notice strong{display:block;margin-bottom:8px}
+.notice .codeRow button{padding:10px 18px;background:var(--accent);color:var(--accent-ink);border:0;text-decoration:none;font-weight:700;border-radius:12px;font-size:14px}
 
 /* sound */
 select{width:100%;background:var(--field);color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:10px;font:inherit;font-size:14px}
@@ -176,6 +178,11 @@ body.adminview .mute{display:none}
   </div>
 
   <div class="panel">
+    <div class="notice warnbox hidden" id="lockBox">
+      <strong>Enter the host code to use Live mode</strong>
+      <div class="codeRow"><input type="password" id="syncCodeIn" placeholder="Host code" autocomplete="off" spellcheck="false" aria-label="Host code"><button class="ghost" id="saveCode" type="button">Unlock</button></div>
+      <div class="synclbl" id="codeMsg" role="status" aria-live="polite">Remembered until you close this tab.</div>
+    </div>
     <div class="stats" id="stats" aria-live="polite"></div>
 
     <div class="field">
@@ -207,8 +214,6 @@ body.adminview .mute{display:none}
       <p class="hint" id="idsHint"></p>
       <div class="chips" id="chips" aria-live="polite"></div>
       <div class="synclbl" id="syncLbl" role="status"></div>
-      <div class="codeRow hidden" id="codeRow"><input type="text" id="syncCodeIn" placeholder="Host code" autocomplete="off" aria-label="Host code"><button class="ghost" id="saveCode" type="button">Save code</button></div>
-      <div class="synclbl" id="codeMsg" role="status" aria-live="polite"></div>
     </div>
 
     <details id="adv">
@@ -359,7 +364,7 @@ body.adminview .mute{display:none}
     <div class="field">
       <label for="syncUrlIn">Shared list web app URL</label>
       <input type="url" id="syncUrlIn" spellcheck="false" placeholder="https://script.google.com/macros/s/…/exec">
-      <input type="text" id="syncCodeAdm" spellcheck="false" autocomplete="off" placeholder="Host code (if you set one in the script)" aria-label="Host code">
+      <input type="text" id="syncCodeAdm" spellcheck="false" autocomplete="off" placeholder="Host code (remembered until this tab is closed)" aria-label="Host code">
       <p class="hint">The Google Apps Script web app that keeps the list for every host. Saved in this browser; the page can also have it built in.</p>
     </div>
     <div class="btnrow">
@@ -517,10 +522,18 @@ const W = weekendWindow(new Date());
 const SYNC_DEFAULT = "https://script.google.com/macros/s/AKfycbzYw64-Dgfl_zzuu5Sym7ANdKCpTJWKwfwg7RYziizlJqJQhyHT_cqdJ4wUdgMCcPI_9g/exec";
 const admin = {code: "", on: false};               // admin passcode lives in memory only, never in storage
 const syncUrl = () => store.get("syncUrl") || SYNC_DEFAULT;
-const syncCode = () => store.get("syncCode") || "";
+// The host code is remembered only until this tab is closed (sessionStorage), never in long-term storage.
+const sessionCode = {
+  get(){ try { return sessionStorage.getItem("sat2-hostcode") || ""; } catch(e){ return ""; } },
+  set(v){ try { v ? sessionStorage.setItem("sat2-hostcode", v) : sessionStorage.removeItem("sat2-hostcode"); } catch(e){} }
+};
+let hostCode = sessionCode.get();                    // still works for the life of the page if the browser blocks session storage
+function setHostCode(v){ hostCode = v; sessionCode.set(v); }
+const syncCode = () => hostCode;
+try { localStorage.removeItem("sat2-syncCode"); sessionStorage.removeItem("sat2-syncCode"); } catch(e){}   // forget codes saved by older versions
 let mode = W.active ? "live" : "test";
 let autoAdd = store.get("autoAdd") !== false;       // add each winner to the ineligible list as they land (the new way)
-let cfg = null, drawn = [], drawnSet = new Set(), runId = 0, toolOk = false, confirmedStale = false;
+let cfg = null, drawn = [], drawnSet = new Set(), runId = 0, toolOk = false;
 const toolUrl = () => store.get("toolUrl") || DEFAULT_TOOL;
 
 /* the ineligible list: liveList is saved (and shared when sync is set up); testList lives in memory only */
@@ -528,10 +541,12 @@ const mk = id => ({id, key: norm(id)});
 let tracked = store.get("tracked");               // local copy of the live list: {window, ids, at}
 let trackReset = false;
 if (!tracked || tracked.window !== W.id){ trackReset = !!tracked && (tracked.ids || []).length > 0; tracked = {window: W.id, ids: [], at: null}; store.set("tracked", tracked); }
+if (syncUrl()){ tracked = {window: W.id, ids: [], at: null}; trackReset = false; store.del("tracked"); }   // with a shared list, nothing about it is kept on this device
 let liveList = (tracked.ids || []).map(mk);
 let testList = [];
 let sync = {state: syncUrl() ? "idle" : "off", at: null};      // off | idle | ok | offline | badcode
 const curList = () => mode === "live" ? liveList : testList;
+const isLocked = () => mode === "live" && !!syncUrl() && sync.state !== "ok";   // Live mode with a shared list needs the host code accepted first
 
 function show(id){
   document.querySelectorAll(".screen").forEach(s => s.classList.toggle("active", s.id === id));
@@ -563,13 +578,13 @@ async function syncCall(body, url, code){
 }
 function applyServerList(ids){
   liveList = ids.map(mk);
-  tracked = {window: W.id, ids: liveList.map(x => x.id), at: Date.now()}; store.set("tracked", tracked);
+  tracked = {window: W.id, ids: liveList.map(x => x.id), at: Date.now()};      // in memory only
   sync = {state: "ok", at: Date.now()};
 }
 async function refreshShared(){
   if (!syncUrl() || mode !== "live") return;
   try { applyServerList((await syncCall({action:"list"})).ids || []); }
-  catch(e){ sync = {state: e.badCode ? "badcode" : "offline", at: sync.at, err: e.message}; }
+  catch(e){ if (e.badCode) setHostCode(""); sync = {state: e.badCode ? "badcode" : "offline", at: sync.at, err: e.message}; }
   renderIneligible();
 }
 async function changeList(action, ids){            // action: "add" | "remove"
@@ -584,6 +599,7 @@ async function changeList(action, ids){            // action: "add" | "remove"
   }
   try { applyServerList((await syncCall({action, ids})).ids || []); renderIneligible(); return true; }
   catch(e){
+    if (e.badCode) setHostCode("");
     sync = {state: e.badCode ? "badcode" : "offline", at: sync.at, err: e.message}; renderIneligible();
     $("status").innerHTML = `<span class="bad">Couldn't save to the shared list${e.badCode ? ": the host code isn't right. Enter it in the Host code box below the list." : ". " + esc(e.message || "Check your connection and try again.")}</span>`;
     return false;
@@ -619,7 +635,11 @@ $("studioChips").addEventListener("click", e => { const b = e.target.closest("bu
 
 function renderIneligible(){
   const list = curList();
-  $("chips").innerHTML = list.length
+  const locked = isLocked();
+  $("ids").disabled = locked; $("addIds").disabled = locked;
+  $("chips").innerHTML = locked
+    ? `<span class="hint">${sync.state === "badcode" ? "Locked until the host code is accepted. The list is hidden." : sync.state === "idle" ? "Loading the list…" : "The list couldn't be loaded."}</span>`
+    : list.length
     ? list.map(x => { const p = byId.get(x.key); return `<span class="chip${p ? "" : " unk"}" title="${p ? esc(p.name + " · " + p.team) : "Not on the roster"}">${esc(p ? p.name + " (" + x.id + ")" : x.id)}<button type="button" data-k="${esc(x.key)}" aria-label="Remove ${esc(x.id)}">×</button></span>`; }).join("")
     : `<span class="hint">No IDs yet.</span>`;
   let lbl = "";
@@ -628,9 +648,9 @@ function renderIneligible(){
   else if (sync.state === "ok") lbl = `<span class="ok">●</span> Shared with all hosts &middot; updated ${clock(sync.at)}`;
   else if (sync.state === "idle") lbl = "Connecting to the shared list…";
   else if (sync.state === "badcode") lbl = `<span class="warn">Enter the host code to use the shared list.</span>`;
-  else lbl = `<span class="bad">Can't reach the shared list${sync.err ? " (" + esc(sync.err) + ")" : ""}.</span> Showing the last copy${sync.at ? " from " + clock(sync.at) : ""}. <button type="button" id="syncRetry">Retry</button>`;
+  else lbl = `<span class="bad">Can't reach the shared list${sync.err ? " (" + esc(sync.err) + ")" : ""}.</span> Live mode needs it. <button type="button" id="syncRetry">Retry</button>`;
   $("syncLbl").innerHTML = lbl;
-  $("codeRow").classList.toggle("hidden", !(mode === "live" && syncUrl() && sync.state === "badcode"));
+  $("lockBox").classList.toggle("hidden", !(mode === "live" && syncUrl() && sync.state === "badcode"));
   if ($("syncRetry")) $("syncRetry").onclick = refreshShared;
   refreshStats();
 }
@@ -667,8 +687,8 @@ $("winAuto").addEventListener("click", () => setAutoAdd(true));
 $("winManual").addEventListener("click", () => setAutoAdd(false));
 function setMode(m){
   if (m === mode) return;
-  if (m === "test") testList = liveList.map(x => mk(x.id));
-  mode = m; confirmedStale = false; $("toReady").textContent = "Continue →"; renderMode();
+  if (m === "test") testList = isLocked() ? [] : liveList.map(x => mk(x.id));      // never copy a list the host code hasn't unlocked
+  mode = m; renderMode();
   if (m === "live") refreshShared();
 }
 $("modeTest").addEventListener("click", () => setMode("test"));
@@ -687,11 +707,11 @@ $("chips").addEventListener("click", e => {
 async function submitCode(){
   const code = $("syncCodeIn").value.trim();
   if (!code){ $("codeMsg").innerHTML = `<span class="bad">Type the host code first.</span>`; return; }
-  store.set("syncCode", code); $("codeMsg").textContent = "Checking the code…"; $("saveCode").disabled = true;
+  setHostCode(code); $("codeMsg").textContent = "Checking the code…"; $("saveCode").disabled = true;
   await refreshShared();
   $("saveCode").disabled = false;
   if (sync.state === "ok") fetchSharedRoster();
-  if (sync.state === "ok"){ $("codeMsg").innerHTML = `<span class="ok">✓ Code accepted. You can add ineligible IDs now.</span>`; $("syncCodeIn").value = ""; }
+  if (sync.state === "ok"){ $("codeMsg").innerHTML = `<span class="ok">✓ Code accepted. It is remembered until you close this tab.</span>`; $("syncCodeIn").value = ""; }
   else if (sync.state === "badcode") $("codeMsg").innerHTML = `<span class="bad">That code isn't right. It's case-sensitive, so check it with whoever set up the list.</span>`;
   else $("codeMsg").innerHTML = `<span class="bad">Couldn't reach the shared list to check the code. ${esc(sync.err || "")}</span>`;
 }
@@ -851,13 +871,14 @@ $("toReady").addEventListener("click", async () => {
   Sound.unlock();
   if (mode === "live" && syncUrl()){
     await refreshShared();
-    if (sync.state !== "ok" && !confirmedStale){
-      confirmedStale = true; $("toReady").textContent = "Continue anyway →";
-      $("status").innerHTML = `<span class="bad">The shared ineligible list couldn't be refreshed, so the list above may be out of date.</span> Fix the connection, or press the button again to continue.`;
+    if (sync.state !== "ok"){
+      $("status").innerHTML = sync.state === "badcode"
+        ? `<span class="bad">Enter the host code first. In Live mode nothing can be drawn or changed until it is accepted.</span>`
+        : `<span class="bad">Can't reach the shared list${sync.err ? " (" + esc(sync.err) + ")" : ""}. Live mode needs it, so check the connection and press Retry.</span>`;
+      if (sync.state === "badcode") $("syncCodeIn").focus();
       return;
     }
   }
-  confirmedStale = false; $("toReady").textContent = "Continue →";
   const {eligible} = refreshStats();
   const count = parseInt($("count").value, 10);
   if (!(count >= 1)){ $("status").innerHTML = `<span class="bad">Enter how many winners to draw (at least 1).</span>`; $("count").focus(); return; }
@@ -921,7 +942,13 @@ async function startDraw(){
   setActions(""); $("result").innerHTML = "";
   show("stage");
   await sleep(400);
-  if (mode === "live" && syncUrl()) await refreshShared();
+  if (mode === "live" && syncUrl()){
+    await refreshShared();
+    if (sync.state !== "ok"){                          // the code was rejected or the list went away: stop before any winner is drawn
+      if (myRun === runId){ runId++; Sound.stopAll(); show("setup"); $("status").innerHTML = `<span class="bad">The draw was stopped because the shared list isn't unlocked${sync.state === "badcode" ? ": enter the host code" : " (can't reach it)"}. Nothing was drawn.</span>`; }
+      return;
+    }
+  }
   for (let i = 0; i < cfg.count; i++){
     const label = cfg.count > 1 ? `Winner ${i+1} of ${cfg.count}` : "Winner";
     let winner = null;
@@ -1138,7 +1165,7 @@ function syncUrlOk(u){ try { const x = new URL(u); return x.protocol === "https:
 $("saveSync").addEventListener("click", () => {
   const u = $("syncUrlIn").value.trim();
   if (!syncUrlOk(u)) return say("trackStatus", "The URL must be a Google Apps Script web app link (https://script.google.com/…).", "bad");
-  store.set("syncUrl", u); store.set("syncCode", $("syncCodeAdm").value.trim()); sync = {state:"idle", at:null};
+  store.set("syncUrl", u); setHostCode($("syncCodeAdm").value.trim()); sync = {state:"idle", at:null};
   say("trackStatus", "Saved. Checking the shared list…"); refreshShared().then(() => { renderAdmin(); say("trackStatus", sync.state === "ok" ? "✓ Connected to the shared list." : sync.state === "badcode" ? "The host code isn't right." : "Saved, but the shared list couldn't be reached.", sync.state === "ok" ? "ok" : "bad"); });
 });
 $("testSync").addEventListener("click", async () => {
@@ -1148,7 +1175,7 @@ $("testSync").addEventListener("click", async () => {
   try { const j = await syncCall({action:"list"}, u, $("syncCodeAdm").value.trim()); say("trackStatus", `✓ It answered. ${(j.ids||[]).length} ID(s) on this weekend's list.`, "ok"); }
   catch(e){ say("trackStatus", e.badCode ? "The host code isn't right." : "Couldn't reach it: " + esc(e.message), "bad"); }
 });
-$("forgetSync").addEventListener("click", () => { store.del("syncUrl"); store.del("syncCode"); sync = {state: syncUrl() ? "idle" : "off", at: null}; say("trackStatus", syncUrl() ? "Back to the built-in shared list." : "Sharing is off. The list is saved on this device only.", "ok"); renderAdmin(); renderMode(); });
+$("forgetSync").addEventListener("click", () => { store.del("syncUrl"); setHostCode(""); sync = {state: syncUrl() ? "idle" : "off", at: null}; say("trackStatus", syncUrl() ? "Back to the built-in shared list." : "Sharing is off. The list is saved on this device only.", "ok"); renderAdmin(); renderMode(); });
 confirmTwice($("clearTracked"), "Clear the ineligible list", async () => {
   try{
     if (syncUrl()) applyServerList((await syncCall({action:"clear"})).ids || []);
@@ -1158,7 +1185,7 @@ confirmTwice($("clearTracked"), "Clear the ineligible list", async () => {
   renderAdmin(); renderIneligible();
 });
 confirmTwice($("resetAll"), "Reset this browser", () => {
-  ["tracked","toolUrl","roster","rosterMeta","sheetUrl","sheetTab","syncUrl","syncCode","dur","count","src","autoAdd"].forEach(store.del);
+  ["tracked","toolUrl","roster","rosterMeta","sheetUrl","sheetTab","syncUrl","dur","count","src","autoAdd"].forEach(store.del); setHostCode("");
   tracked = {window: W.id, ids: [], at: null}; store.set("tracked", tracked); liveList = []; testList = [];
   sync = {state: syncUrl() ? "idle" : "off", at: null};
   setRoster(BUILTIN.map(a => toPerson(...a))); autoAdd = true; renderMode(); renderWinToggle(); renderAdmin(); renderFooter(); probeTool(); refreshShared();
