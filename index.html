@@ -174,6 +174,7 @@ body.adminview .mute{display:none}
       <div class="chips" id="chips" aria-live="polite"></div>
       <div class="synclbl" id="syncLbl" role="status"></div>
       <div class="codeRow hidden" id="codeRow"><input type="text" id="syncCodeIn" placeholder="Host code" autocomplete="off" aria-label="Host code"><button class="ghost" id="saveCode" type="button">Save code</button></div>
+      <div class="synclbl" id="codeMsg" role="status" aria-live="polite"></div>
     </div>
 
     <div class="stats" id="stats" aria-live="polite"></div>
@@ -312,10 +313,11 @@ const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const norm = s => s.trim().toLowerCase().replace(/\s+/g,"_");
+const mem = {};                                     // fallback so settings still work for this visit if the browser blocks storage
 const store = {
-  get(k){ try { const v = localStorage.getItem("sat2-"+k); return v === null ? null : JSON.parse(v); } catch(e){ return null; } },
-  set(k,v){ try { localStorage.setItem("sat2-"+k, JSON.stringify(v)); } catch(e){} },
-  del(k){ try { localStorage.removeItem("sat2-"+k); } catch(e){} }
+  get(k){ if (k in mem) return mem[k]; try { const v = localStorage.getItem("sat2-"+k); return v === null ? null : JSON.parse(v); } catch(e){ return null; } },
+  set(k,v){ mem[k] = v; try { localStorage.setItem("sat2-"+k, JSON.stringify(v)); } catch(e){} },
+  del(k){ delete mem[k]; try { localStorage.removeItem("sat2-"+k); } catch(e){} }
 };
 
 /* ============ marathon weekend window: Fri 8:00 AM ET -> Mon 9:00 AM ET ============ */
@@ -482,7 +484,7 @@ function applyServerList(ids){
 async function refreshShared(){
   if (!syncUrl() || mode !== "live") return;
   try { applyServerList((await syncCall({action:"list"})).ids || []); }
-  catch(e){ sync = {state: e.badCode ? "badcode" : "offline", at: sync.at}; }
+  catch(e){ sync = {state: e.badCode ? "badcode" : "offline", at: sync.at, err: e.message}; }
   renderIneligible();
 }
 async function changeList(action, ids){            // action: "add" | "remove"
@@ -497,8 +499,8 @@ async function changeList(action, ids){            // action: "add" | "remove"
   }
   try { applyServerList((await syncCall({action, ids})).ids || []); renderIneligible(); return true; }
   catch(e){
-    sync = {state: e.badCode ? "badcode" : "offline", at: sync.at}; renderIneligible();
-    $("status").innerHTML = `<span class="bad">Couldn't save to the shared list${e.badCode ? ": the host code isn't right." : ". Check your connection and try again."}</span>`;
+    sync = {state: e.badCode ? "badcode" : "offline", at: sync.at, err: e.message}; renderIneligible();
+    $("status").innerHTML = `<span class="bad">Couldn't save to the shared list${e.badCode ? ": the host code isn't right. Enter it in the Host code box below the list." : ". " + esc(e.message || "Check your connection and try again.")}</span>`;
     return false;
   }
 }
@@ -525,7 +527,7 @@ function renderIneligible(){
   else if (sync.state === "ok") lbl = `<span class="ok">●</span> Shared with all hosts &middot; updated ${clock(sync.at)}`;
   else if (sync.state === "idle") lbl = "Connecting to the shared list…";
   else if (sync.state === "badcode") lbl = `<span class="warn">Enter the host code to use the shared list.</span>`;
-  else lbl = `<span class="bad">Can't reach the shared list.</span> Showing the last copy${sync.at ? " from " + clock(sync.at) : ""}. <button type="button" id="syncRetry">Retry</button>`;
+  else lbl = `<span class="bad">Can't reach the shared list${sync.err ? " (" + esc(sync.err) + ")" : ""}.</span> Showing the last copy${sync.at ? " from " + clock(sync.at) : ""}. <button type="button" id="syncRetry">Retry</button>`;
   $("syncLbl").innerHTML = lbl;
   $("codeRow").classList.toggle("hidden", !(mode === "live" && syncUrl() && sync.state === "badcode"));
   if ($("syncRetry")) $("syncRetry").onclick = refreshShared;
@@ -566,7 +568,18 @@ $("chips").addEventListener("click", e => {
   const b = e.target.closest("button[data-k]"); if (!b) return;
   const item = curList().find(x => x.key === b.dataset.k); if (item) changeList("remove", [item.id]);
 });
-$("saveCode").addEventListener("click", () => { store.set("syncCode", $("syncCodeIn").value.trim()); refreshShared(); });
+async function submitCode(){
+  const code = $("syncCodeIn").value.trim();
+  if (!code){ $("codeMsg").innerHTML = `<span class="bad">Type the host code first.</span>`; return; }
+  store.set("syncCode", code); $("codeMsg").textContent = "Checking the code…"; $("saveCode").disabled = true;
+  await refreshShared();
+  $("saveCode").disabled = false;
+  if (sync.state === "ok"){ $("codeMsg").innerHTML = `<span class="ok">✓ Code accepted. You can add ineligible IDs now.</span>`; $("syncCodeIn").value = ""; }
+  else if (sync.state === "badcode") $("codeMsg").innerHTML = `<span class="bad">That code isn't right. It's case-sensitive, so check it with whoever set up the list.</span>`;
+  else $("codeMsg").innerHTML = `<span class="bad">Couldn't reach the shared list to check the code. ${esc(sync.err || "")}</span>`;
+}
+$("saveCode").addEventListener("click", submitCode);
+$("syncCodeIn").addEventListener("keydown", e => { if (e.key === "Enter"){ e.preventDefault(); submitCode(); } });
 setInterval(() => { if (!document.hidden && mode === "live" && syncUrl() && $("setup").classList.contains("active")) refreshShared(); }, 15000);
 
 $("dur").addEventListener("input", () => { $("durv").textContent = $("dur").value + "s"; store.set("dur", $("dur").value); });
