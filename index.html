@@ -70,6 +70,11 @@ button:focus-visible,a:focus-visible,summary:focus-visible{outline:2px solid #ff
 .seg button[aria-pressed="true"].t{background:var(--warn)}
 .modenote{font-size:13px;color:var(--muted);text-align:center;max-width:60ch}
 
+.seg.wide{display:flex;flex-wrap:wrap;border-radius:12px}
+.seg.wide button{flex:1 1 200px;border-radius:0;padding:10px 14px;letter-spacing:0;font-size:14px}
+.seg.wide button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+.warnline{color:var(--warn);font-size:clamp(14px,2vw,18px);margin-top:8px}
+
 /* Screen 2: ready */
 #ready{justify-content:center;text-align:center;gap:18px}
 .count{color:var(--muted);font-size:clamp(16px,2.4vw,22px);letter-spacing:3px;text-transform:uppercase}
@@ -138,6 +143,14 @@ select:focus{outline:2px solid var(--accent);outline-offset:1px}
 .mute:hover{border-color:var(--muted)}
 body.adminview .mute{display:none}
 
+/* Prize winners screen */
+#prizes{gap:0}
+#prizes .panel{max-width:760px}
+.prizeout{min-height:240px;white-space:pre;overflow:auto;font-size:13px}
+.accentbtn{background:transparent;color:var(--accent);border:1px solid var(--accent);padding:12px 20px}
+.accentbtn:hover{background:rgba(242,177,52,.12)}
+.bigl a{color:var(--accent);font-weight:700;font-size:18px}
+
 /* Admin */
 .adminbody{display:flex;flex-direction:column;gap:16px;width:100%;align-items:center}
 #admin{gap:16px}
@@ -177,6 +190,15 @@ body.adminview .mute{display:none}
       <div class="synclbl" id="syncLbl" role="status"></div>
       <div class="codeRow hidden" id="codeRow"><input type="text" id="syncCodeIn" placeholder="Host code" autocomplete="off" aria-label="Host code"><button class="ghost" id="saveCode" type="button">Save code</button></div>
       <div class="synclbl" id="codeMsg" role="status" aria-live="polite"></div>
+    </div>
+
+    <div class="field">
+      <span class="lbl" id="afterWinLbl">When someone wins</span>
+      <div class="seg wide" role="group" aria-labelledby="afterWinLbl">
+        <button type="button" id="winAuto" aria-pressed="true">Add winners to the ineligible list automatically</button>
+        <button type="button" id="winManual" aria-pressed="false">Hosts add winners after they claim</button>
+      </div>
+      <p class="hint" id="winHint"></p>
     </div>
 
     <div class="field">
@@ -235,8 +257,45 @@ body.adminview .mute{display:none}
   <section id="summary" class="hidden">
     <h2>🏆 Winners</h2>
     <div class="wlist" id="wlist"></div>
-    <div class="actions"><button class="ghost" id="backToStage">&larr; Back</button><button class="ghost" id="newDraw2">New draw</button></div>
+    <div class="actions"><button class="ghost" id="backToStage">&larr; Back</button><button class="accentbtn" id="prizeBtn2">Prize winners table</button><button class="ghost" id="newDraw2">New draw</button></div>
   </section>
+</main>
+
+<!-- PRIZE WINNERS SCREEN -->
+<main class="screen" id="prizes">
+  <h1>Prize winners</h1>
+  <p class="sub">Update the WikiTree prize winners table with this draw.</p>
+  <div class="panel">
+    <div class="bigl"><a href="https://www.wikitree.com/wiki/Space:Prize_Winners" target="_blank" rel="noopener">Open the Prize Winners page on WikiTree &rarr;</a></div>
+    <p class="hint">Find the Current Event Winners table on that page, choose Edit, and paste in the rows below.</p>
+
+    <div class="field">
+      <label for="eventName">Event name</label>
+      <input type="text" id="eventName" spellcheck="false" autocomplete="off">
+    </div>
+
+    <div class="field">
+      <span class="lbl" id="fmtLbl">What to copy</span>
+      <div class="seg wide" role="group" aria-labelledby="fmtLbl">
+        <button type="button" id="fmtRows" aria-pressed="true">Rows to add</button>
+        <button type="button" id="fmtTable" aria-pressed="false">Whole table</button>
+      </div>
+      <p class="hint" id="fmtHint"></p>
+    </div>
+
+    <div class="field">
+      <label for="prizeOut">WikiTree markup</label>
+      <textarea id="prizeOut" class="prizeout" spellcheck="false" wrap="off"></textarea>
+      <div class="btnrow"><button class="primary" id="copyPrize" type="button" style="width:auto;font-size:15px;padding:10px 18px">Copy to clipboard</button></div>
+      <div class="status" id="copyMsg" role="status" aria-live="polite"></div>
+      <p class="hint">The names are split into First and Last automatically. Check them, and fix any by hand in the box, before you copy. Changing the event name or the format above rebuilds the markup.</p>
+    </div>
+
+    <div class="btnrow">
+      <button class="primary" id="prizesHome" type="button" style="width:auto;flex:1 1 220px">Back to the first screen</button>
+      <button class="ghost" id="prizesBack" type="button">&larr; Back to the winners</button>
+    </div>
+  </div>
 </main>
 
 <!-- ADMIN VIEW (#admin) -->
@@ -460,6 +519,7 @@ const admin = {code: "", on: false};               // admin passcode lives in me
 const syncUrl = () => store.get("syncUrl") || SYNC_DEFAULT;
 const syncCode = () => store.get("syncCode") || "";
 let mode = W.active ? "live" : "test";
+let autoAdd = store.get("autoAdd") !== false;       // add each winner to the ineligible list as they land (the new way)
 let cfg = null, drawn = [], drawnSet = new Set(), runId = 0, toolOk = false, confirmedStale = false;
 const toolUrl = () => store.get("toolUrl") || DEFAULT_TOOL;
 
@@ -585,11 +645,26 @@ function renderMode(){
   if (mode === "live" && !W.active) note = note.replace(/for the marathon weekend \(until [^)]*\)/, `(it's outside the marathon weekend; the list resets ${fmtET(W.next)})`);
   if (trackReset && mode === "live") note += " The previous weekend's list was cleared.";
   $("modeNote").textContent = note;
-  $("idsHint").textContent = mode === "live"
-    ? "Previous winners who have already claimed their prize. Paste IDs (one per line or comma-separated; wikitree.com/wiki/… links work too) and press Add."
-    : "Test list. Starts as a copy of the live list; nothing here is saved.";
+  renderIdsHint();
   renderIneligible();
 }
+function renderIdsHint(){
+  $("idsHint").textContent = mode === "test"
+    ? "Test list. Starts as a copy of the live list; nothing here is saved."
+    : autoAdd
+      ? "Winners are added here as soon as they land. You can also add IDs by hand (paste one per line or comma-separated; wikitree.com/wiki/… links work too) and press Add. Remove one with the x."
+      : "Previous winners who have already claimed their prize. Paste IDs (one per line or comma-separated; wikitree.com/wiki/… links work too) and press Add.";
+}
+function renderWinToggle(){
+  $("winAuto").setAttribute("aria-pressed", autoAdd); $("winManual").setAttribute("aria-pressed", !autoAdd);
+  $("winHint").textContent = autoAdd
+    ? "Each winner goes on the ineligible list the moment they land, so they can't win again this weekend. No claim window is needed."
+    : "Winners are not added for you. Add them to the ineligible list yourself once they have claimed.";
+  renderIdsHint();
+}
+function setAutoAdd(v){ autoAdd = v; store.set("autoAdd", v); renderWinToggle(); }
+$("winAuto").addEventListener("click", () => setAutoAdd(true));
+$("winManual").addEventListener("click", () => setAutoAdd(false));
 function setMode(m){
   if (m === mode) return;
   if (m === "test") testList = liveList.map(x => mk(x.id));
@@ -820,7 +895,9 @@ async function spin(pickP, seconds, id){
   if (r.v){ await ensureLoaded(r.v.img); if (id !== runId) return null; bib.src = r.v.img; bib.alt = `Bib ${r.v.bib}`; frame.classList.add("landed"); Sound.landed(); }
   return r;
 }
+let shownId = "";
 function showWinner(p, label){
+  shownId = p.id;
   $("result").innerHTML = `<div class="fadein">
     <div class="round">${esc(label)}</div>
     <div class="winner">${esc(p.name)}</div>
@@ -865,15 +942,19 @@ async function startDraw(){
     }
     drawn.push(winner); drawnSet.add(norm(winner.id));
     showWinner(winner, label);
+    if (autoAdd) changeList("add", [winner.id]).then(saved => {
+      if (!saved && shownId === winner.id && myRun === runId) $("result").insertAdjacentHTML("beforeend", `<div class="warnline">Couldn't add ${esc(winner.id)} to the shared ineligible list. Add them by hand on the setup screen.</div>`);
+    });
     if (i < cfg.count - 1){
       setActions(`<button class="primary" id="nextBtn">Draw next winner ▶</button>`);
       await waitForClick("nextBtn");
       if (myRun !== runId) return;
     } else {
       setActions(cfg.count > 1
-        ? `<button class="primary" id="allBtn">Show all winners</button><button class="ghost" id="newBtn">New draw</button>`
-        : `<button class="ghost" id="newBtn">New draw</button>`);
+        ? `<button class="primary" id="allBtn">Show all winners</button><button class="accentbtn" id="prizeBtn">Prize winners table</button><button class="ghost" id="newBtn">New draw</button>`
+        : `<button class="primary" id="prizeBtn">Prize winners table</button><button class="ghost" id="newBtn">New draw</button>`);
       if ($("allBtn")) $("allBtn").onclick = openSummary;
+      $("prizeBtn").onclick = openPrizes;
       $("newBtn").onclick = newDraw;
     }
   }
@@ -883,6 +964,42 @@ function openSummary(){
   $("spinView").classList.add("hidden"); $("summary").classList.remove("hidden");
 }
 $("backToStage").addEventListener("click", () => { $("summary").classList.add("hidden"); $("spinView").classList.remove("hidden"); });
+/* ---------- prize winners screen: WikiTree markup for the Current Event Winners table ---------- */
+const NAME_PARTICLES = new Set(["van","von","der","den","de","del","della","di","da","du","la","le","los","las","el","al","bin","ibn","ten","ter","op","af","zu","st","st.","ó","ni","ní","nic"]);
+function splitName(full){                         // "Esmé van der Westhuizen" -> ["Esmé", "van der Westhuizen"]
+  const parts = String(full).trim().split(/\s+/).filter(Boolean);
+  if (parts.length <= 1) return [parts[0] || "", ""];
+  let i = parts.length - 1;
+  while (i > 1 && NAME_PARTICLES.has(parts[i-1].toLowerCase())) i--;
+  return [parts.slice(0, i).join(" "), parts.slice(i).join(" ")];
+}
+let prizeFmt = "rows";
+function prizeMarkup(){
+  const ev = $("eventName").value.trim() || "SaTXI";
+  const rows = drawn.map(p => { const [first, last] = splitName(p.name); return `|-\n|${p.id}||${first}||${last}||${ev}`; }).join("\n");
+  if (prizeFmt === "rows") return rows;
+  return `=== Current Event Winners ===\n\n{| border="1" class="wikitable sortable"\n!WikiTree ID!!First!!Last!!Event\n${rows}\n|-\n|}`;
+}
+function renderPrizes(){
+  $("fmtRows").setAttribute("aria-pressed", prizeFmt === "rows"); $("fmtTable").setAttribute("aria-pressed", prizeFmt === "table");
+  $("fmtHint").textContent = prizeFmt === "rows"
+    ? "Paste these rows into the existing table, just above its last line (the |} that closes the table)."
+    : "A complete Current Event Winners section containing only this draw's winners.";
+  $("prizeOut").value = prizeMarkup(); $("copyMsg").textContent = "";
+}
+function openPrizes(){ $("eventName").value = store.get("eventName") || "SaTXI"; renderPrizes(); show("prizes"); }
+$("fmtRows").addEventListener("click", () => { prizeFmt = "rows"; renderPrizes(); });
+$("fmtTable").addEventListener("click", () => { prizeFmt = "table"; renderPrizes(); });
+$("eventName").addEventListener("input", () => { store.set("eventName", $("eventName").value.trim()); renderPrizes(); });
+$("copyPrize").addEventListener("click", async () => {
+  const box = $("prizeOut"); box.focus(); box.select();
+  try { await navigator.clipboard.writeText(box.value); $("copyMsg").innerHTML = `<span class="ok">✓ Copied.</span>`; }
+  catch(e){ try { document.execCommand("copy"); $("copyMsg").innerHTML = `<span class="ok">✓ Copied.</span>`; } catch(e2){ $("copyMsg").innerHTML = `<span class="warn">Select the text in the box and copy it with Ctrl+C or Cmd+C.</span>`; } }
+});
+$("prizesHome").addEventListener("click", () => newDraw());
+$("prizesBack").addEventListener("click", () => show("stage"));
+$("prizeBtn2").addEventListener("click", openPrizes);
+
 function newDraw(){ runId++; Sound.stopAll(); studio = []; renderStudio(); show("setup"); }
 $("newDraw2").addEventListener("click", newDraw);
 document.addEventListener("keydown", e => {
@@ -1041,10 +1158,10 @@ confirmTwice($("clearTracked"), "Clear the ineligible list", async () => {
   renderAdmin(); renderIneligible();
 });
 confirmTwice($("resetAll"), "Reset this browser", () => {
-  ["tracked","toolUrl","roster","rosterMeta","sheetUrl","sheetTab","syncUrl","syncCode","dur","count","src"].forEach(store.del);
+  ["tracked","toolUrl","roster","rosterMeta","sheetUrl","sheetTab","syncUrl","syncCode","dur","count","src","autoAdd"].forEach(store.del);
   tracked = {window: W.id, ids: [], at: null}; store.set("tracked", tracked); liveList = []; testList = [];
   sync = {state: syncUrl() ? "idle" : "off", at: null};
-  setRoster(BUILTIN.map(a => toPerson(...a))); renderMode(); renderAdmin(); renderFooter(); probeTool(); refreshShared();
+  setRoster(BUILTIN.map(a => toPerson(...a))); autoAdd = true; renderMode(); renderWinToggle(); renderAdmin(); renderFooter(); probeTool(); refreshShared();
   say("trackStatus", "This browser is back to its defaults. The shared list was not changed.", "ok");
 });
 
@@ -1056,7 +1173,7 @@ function route(){
 window.addEventListener("hashchange", route);
 $("backToDraw").addEventListener("click", e => { e.preventDefault(); history.replaceState(null, "", location.pathname + location.search); route(); });
 
-loadRoster(); renderMode(); renderFooter(); probeTool(); route();
+loadRoster(); renderMode(); renderWinToggle(); renderFooter(); probeTool(); route();
 refreshShared(); fetchSharedRoster(); renderStudio();
 </script>
 </body>
