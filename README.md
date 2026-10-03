@@ -1,4 +1,4 @@
-[README.md](https://github.com/user-attachments/files/33005149/README.md)
+[README.md](https://github.com/user-attachments/files/33005584/README.md)
 # WikiTree Marathon Drawing
 
 A live-drawing tool for the WikiTree Source-a-Thon livecast. The host pulls winners from WikiTree's Random Participant tool, and the page shows a bib slideshow that slows down and lands on each winner, with a drum roll while it spins and applause when the winner lands. It shows the winner's name, WikiTree ID, team and bib.
@@ -13,10 +13,11 @@ The tool has three screens.
 
 1. **Setup**
    - Choose **Test** or **Live** at the top. Test mode shows an amber banner on every screen and saves nothing, so use it to practise. Live mode saves the ineligible list.
+   - A summary line at the top shows how many participants are eligible and how many are marked ineligible in the sheet.
    - Enter how many winners to draw.
+   - Add the **studio hosts** for this draw (see below).
    - Choose **When someone wins** (see below): winners are either added to the ineligible list automatically, or hosts add them by hand after they claim.
    - Add any other ineligible WikiTree IDs by hand. Paste IDs one per line or separated by commas, or paste wikitree.com/wiki/... links, then press **Add to list**. Remove an ID with the x on its chip.
-   - Add the **studio hosts** for this draw (see below).
    - Under **Draw settings** you can choose where winners come from, turn the drum roll and applause on or off, run a **Sound check**, and set the spin length (3 to 20 seconds).
    - Press **Continue**.
 2. **Ready to draw**: press the WikiTree logo to start.
