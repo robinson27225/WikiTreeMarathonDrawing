@@ -176,20 +176,19 @@ body.adminview .mute{display:none}
   </div>
 
   <div class="panel">
+    <div class="stats" id="stats" aria-live="polite"></div>
+
     <div class="field">
       <label for="count">How many winners are we drawing?</label>
       <input type="number" id="count" min="1" max="50" step="1" value="1" inputmode="numeric">
     </div>
 
     <div class="field">
-      <label for="ids">Ineligible WikiTree IDs</label>
-      <textarea id="ids" spellcheck="false" placeholder="Add IDs here, one per line or separated by commas"></textarea>
-      <div class="btnrow"><button class="ghost" id="addIds" type="button">Add to list</button></div>
-      <p class="hint" id="idsHint"></p>
-      <div class="chips" id="chips" aria-live="polite"></div>
-      <div class="synclbl" id="syncLbl" role="status"></div>
-      <div class="codeRow hidden" id="codeRow"><input type="text" id="syncCodeIn" placeholder="Host code" autocomplete="off" aria-label="Host code"><button class="ghost" id="saveCode" type="button">Save code</button></div>
-      <div class="synclbl" id="codeMsg" role="status" aria-live="polite"></div>
+      <label for="studioIds">Studio hosts (not eligible for this draw only)</label>
+      <textarea id="studioIds" class="short" spellcheck="false" placeholder="WikiTree IDs of the hosts in the studio"></textarea>
+      <div class="btnrow"><button class="ghost" id="addStudio" type="button">Add to list</button></div>
+      <div class="chips" id="studioChips" aria-live="polite"></div>
+      <p class="hint">Applies to this draw only. These IDs are not saved or shared, and the list clears when you press New draw.</p>
     </div>
 
     <div class="field">
@@ -202,14 +201,15 @@ body.adminview .mute{display:none}
     </div>
 
     <div class="field">
-      <label for="studioIds">Studio hosts (not eligible for this draw only)</label>
-      <textarea id="studioIds" class="short" spellcheck="false" placeholder="WikiTree IDs of the hosts in the studio"></textarea>
-      <div class="btnrow"><button class="ghost" id="addStudio" type="button">Add to list</button></div>
-      <div class="chips" id="studioChips" aria-live="polite"></div>
-      <p class="hint">Applies to this draw only. These IDs are not saved or shared, and the list clears when you press New draw.</p>
+      <label for="ids">Ineligible WikiTree IDs</label>
+      <textarea id="ids" spellcheck="false" placeholder="Add IDs here, one per line or separated by commas"></textarea>
+      <div class="btnrow"><button class="ghost" id="addIds" type="button">Add to list</button></div>
+      <p class="hint" id="idsHint"></p>
+      <div class="chips" id="chips" aria-live="polite"></div>
+      <div class="synclbl" id="syncLbl" role="status"></div>
+      <div class="codeRow hidden" id="codeRow"><input type="text" id="syncCodeIn" placeholder="Host code" autocomplete="off" aria-label="Host code"><button class="ghost" id="saveCode" type="button">Save code</button></div>
+      <div class="synclbl" id="codeMsg" role="status" aria-live="polite"></div>
     </div>
-
-    <div class="stats" id="stats" aria-live="polite"></div>
 
     <details id="adv">
       <summary>Draw settings</summary>
