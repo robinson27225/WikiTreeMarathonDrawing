@@ -145,6 +145,24 @@ select:focus{outline:2px solid var(--accent);outline-offset:1px}
 .mute:hover{border-color:var(--muted)}
 body.adminview .mute{display:none}
 
+/* Other events: spinning balls */
+.ballwrap{width:min(80vw,calc(100vh - 320px),520px);min-width:240px;aspect-ratio:1;display:flex;align-items:center;justify-content:center}
+.ball{position:relative;width:100%;height:100%;border-radius:50%;--c1:#FCB815;--c2:#7e5c0a;--ring:#97720c;overflow:hidden;
+  background:radial-gradient(circle at 50% 50%,var(--c1) 0,var(--c1) 52%,var(--c2) 100%);
+  box-shadow:inset -18px -22px 40px rgba(0,0,0,.35),0 22px 40px rgba(0,0,0,.5);transition:box-shadow .4s}
+.ballspin{position:absolute;inset:0;border-radius:50%;will-change:transform;
+  background:conic-gradient(from 0deg,rgba(255,255,255,0) 0 18deg,rgba(255,255,255,.38) 18deg 58deg,rgba(255,255,255,0) 58deg 190deg,rgba(0,0,0,.2) 190deg 236deg,rgba(255,255,255,0) 236deg 360deg)}
+.balllabel{position:absolute;left:50%;top:50%;width:66%;aspect-ratio:1;transform:translate(-50%,-50%);border-radius:50%;background:#fff;color:#1c2b21;
+  display:flex;align-items:center;justify-content:center;text-align:center;font-weight:800;line-height:1.1;padding:7%;overflow:hidden;overflow-wrap:normal;
+  box-sizing:border-box;border:max(5px,1.2vmin) solid var(--ring,#fff);box-shadow:0 2px 10px rgba(0,0,0,.3)}
+.ballshine{position:absolute;inset:0;border-radius:50%;pointer-events:none;background:radial-gradient(circle at 31% 25%,rgba(255,255,255,.6) 0,rgba(255,255,255,0) 33%)}
+.ballwrap.landed .ball{box-shadow:inset -18px -22px 40px rgba(0,0,0,.35),0 0 0 6px rgba(242,177,52,.28),0 0 90px rgba(242,177,52,.6);animation:pop .5s ease-out}
+.cardface{aspect-ratio:212/146;display:flex;align-items:center;justify-content:center;background:var(--bg)}
+.miniball{width:62%;max-height:92%;aspect-ratio:1;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  background:radial-gradient(circle,var(--c1) 0,var(--c1) 52%,var(--c2) 100%);box-shadow:inset -6px -8px 14px rgba(0,0,0,.35)}
+.miniball span{width:68%;aspect-ratio:1;border-radius:50%;background:#fff;color:#1c2b21;display:flex;align-items:center;justify-content:center;text-align:center;
+  font:800 12px/1.1 system-ui,sans-serif;padding:5%;overflow:hidden;overflow-wrap:anywhere}
+
 /* Prize winners screen */
 #prizes{gap:0}
 #prizes .panel{max-width:760px}
@@ -158,7 +176,7 @@ body.adminview .mute{display:none}
 #admin{gap:16px}
 #admin .panel h2{display:flex;justify-content:space-between;align-items:baseline;gap:12px}
 .mono{font-family:ui-monospace,Menlo,Consolas,monospace}
-@media (prefers-reduced-motion:reduce){.bibframe.landed,.fadein,.logobtn,.screen.active{animation:none}}
+@media (prefers-reduced-motion:reduce){.ballwrap.landed .ball,.bibframe.landed,.fadein,.logobtn,.screen.active{animation:none}}
 </style>
 </head>
 <body>
@@ -184,6 +202,15 @@ body.adminview .mute{display:none}
       <div class="synclbl" id="codeMsg" role="status" aria-live="polite">Remembered until you close this tab.</div>
     </div>
     <div class="stats" id="stats" aria-live="polite"></div>
+
+    <div class="field">
+      <span class="lbl" id="evLbl">What are we drawing for?</span>
+      <div class="seg wide" role="group" aria-labelledby="evLbl">
+        <button type="button" id="evSat" aria-pressed="true">Source-a-Thon marathon (bibs)</button>
+        <button type="button" id="evOther" aria-pressed="false">Other event (balls)</button>
+      </div>
+      <p class="hint" id="evHint"></p>
+    </div>
 
     <div class="field">
       <label for="count">How many winners are we drawing?</label>
@@ -222,8 +249,8 @@ body.adminview .mute{display:none}
         <div class="field">
           <span class="lbl">Pick winners from</span>
           <div class="opts" role="radiogroup" aria-label="Pick winners from">
-            <label><input type="radio" name="src" id="srcTool" value="tool" checked> WikiTree random participant tool (active participants only)</label>
-            <label><input type="radio" name="src" id="srcRoster" value="roster"> Entire eligible roster</label>
+            <label id="srcToolRow"><input type="radio" name="src" id="srcTool" value="tool" checked> WikiTree random participant tool (active participants only)</label>
+            <label><input type="radio" name="src" id="srcRoster" value="roster"> <span id="srcRosterTxt">Entire eligible roster</span></label>
           </div>
           <div class="notice" id="toolNote">Checking the WikiTree tool…</div>
         </div>
@@ -256,6 +283,7 @@ body.adminview .mute{display:none}
 <main class="screen" id="stage">
   <div class="stagewrap" id="spinView">
     <div class="bibframe" id="frame"><img id="bib" alt=""></div>
+    <div class="ballwrap hidden" id="ballwrap"><div class="ball" id="ball"><div class="ballspin" id="ballspin"></div><div class="balllabel" id="balllabel"></div><div class="ballshine"></div></div></div>
     <div class="result" id="result" aria-live="polite"></div>
     <div class="actions" id="actions"></div>
   </div>
@@ -286,6 +314,11 @@ body.adminview .mute{display:none}
         <button type="button" id="fmtTable" aria-pressed="false">Whole table</button>
       </div>
       <p class="hint" id="fmtHint"></p>
+      <details id="existingBox" class="hidden">
+        <summary>Already have the table on WikiTree? Paste it to add to it</summary>
+        <textarea id="existingTable" class="short" spellcheck="false" wrap="off" placeholder="Paste the whole Current Event Winners section from WikiTree's edit box"></textarea>
+        <p class="hint">Your rows are kept as they are. Anyone who isn't in it yet is added just before the closing |}.</p>
+      </details>
     </div>
 
     <div class="field">
@@ -357,6 +390,36 @@ body.adminview .mute{display:none}
     </div>
     <div class="btnrow"><button class="danger" id="resetRoster" type="button">Back to the built-in table for everyone</button></div>
     <div class="status" id="rosterStatus" role="status" aria-live="polite"></div>
+  </section>
+
+  <section class="panel" aria-labelledby="h-pool">
+    <h2 id="h-pool">Event list (other events)</h2>
+    <div class="stats" id="poolStats"></div>
+    <div class="field">
+      <label for="poolEvent">Event name</label>
+      <input type="text" id="poolEvent" spellcheck="false" autocomplete="off" placeholder="Connect-a-Thon October 2026">
+      <p class="hint">Each event name keeps its own ineligible list, so a new event name starts fresh.</p>
+    </div>
+    <div class="field">
+      <span class="lbl" id="poolKindLbl">The list contains</span>
+      <div class="seg wide" role="group" aria-labelledby="poolKindLbl">
+        <button type="button" id="pkIds" aria-pressed="true">Participants' WikiTree IDs</button>
+        <button type="button" id="pkNames" aria-pressed="false">Attendee names (not on WikiTree)</button>
+      </div>
+    </div>
+    <div class="field">
+      <label for="poolText">The list</label>
+      <textarea id="poolText" spellcheck="false"></textarea>
+      <input type="file" id="poolFile" accept=".csv,.tsv,.txt,text/plain,text/csv" aria-label="Upload a list">
+      <p class="hint" id="poolHint"></p>
+    </div>
+    <div class="btnrow"><button class="ghost" id="readPool" type="button">Read this list</button></div>
+    <div class="notice hidden" id="poolPending">
+      <div id="poolPendingText"></div>
+      <div class="btnrow"><button class="primary" id="publishPool" type="button" style="width:auto;font-size:15px;padding:10px 16px">Publish to all hosts</button><button class="ghost" id="discardPool" type="button">Discard</button></div>
+    </div>
+    <div class="btnrow"><button class="danger" id="clearPoolBtn" type="button">Remove the event list for everyone</button></div>
+    <div class="status" id="poolStatus" role="status" aria-live="polite"></div>
   </section>
 
   <section class="panel" aria-labelledby="h-track">
@@ -431,14 +494,23 @@ const fmtET = d => d.toLocaleString("en-US",{timeZone:"America/New_York",weekday
 
 /* ============ roster ============ */
 let people = [], byId = new Map(), sheetIneligible = [];
+let satPeople = [], poolPeople = [], poolMeta = null, poolState = "none";   // poolState: none | ok | badcode | offline
+let eventKind = store.get("eventKind") === "other" ? "other" : "sat";        // "sat" = Source-a-Thon marathon (bibs), "other" = any other event (balls)
 function toPerson(id,name,team,bib,note,img){
   return {id, name, team, bib, note: note || "", img: img || (IMG_BASE + bib + ".png")};
 }
-function setRoster(list){
-  people = list; byId = new Map(list.map(p => [norm(p.id), p]));
-  sheetIneligible = list.filter(p => p.note);
-  preloadAll();
+// other events: value is a WikiTree ID (kind "ids") or an attendee's name (kind "names")
+function toPoolPerson(value, name, team, note, kind){
+  return {id: value, name: kind === "ids" ? (name || value) : value, hasName: kind === "names" || !!name, team: team || "", bib: "", note: note || "", img: ""};
 }
+function applyActive(){                              // point the whole page at the marathon roster or the event list
+  people = eventKind === "sat" ? satPeople : poolPeople;
+  byId = new Map(people.map(p => [norm(p.id), p]));
+  sheetIneligible = people.filter(p => p.note);
+  if (eventKind === "sat") preloadAll();
+}
+function setRoster(list){ satPeople = list; if (eventKind === "sat") applyActive(); }
+function setPool(rows, meta){ poolMeta = meta; poolPeople = rows.map(r => toPoolPerson(r[0], r[1], r[2], r[3], meta.kind)); if (eventKind === "other") applyActive(); }
 function parseCSV(text){
   text = text.replace(/^﻿/,"");
   const firstLine = text.split(/\r?\n/)[0] || "";
@@ -545,6 +617,8 @@ if (syncUrl()){ tracked = {window: W.id, ids: [], at: null}; trackReset = false;
 let liveList = (tracked.ids || []).map(mk);
 let testList = [];
 let sync = {state: syncUrl() ? "idle" : "off", at: null};      // off | idle | ok | offline | badcode
+const slug = s => String(s).trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 60) || "event";
+const scopeId = () => eventKind === "sat" ? W.id : "event-" + slug(poolMeta ? poolMeta.event : "none");
 const curList = () => mode === "live" ? liveList : testList;
 const isLocked = () => mode === "live" && !!syncUrl() && sync.state !== "ok";   // Live mode with a shared list needs the host code accepted first
 
@@ -570,7 +644,7 @@ const clock = ms => new Date(ms).toLocaleTimeString("en-US",{hour:"numeric",minu
 async function syncCall(body, url, code){
   const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), 10000);
   try{
-    const res = await fetch(url || syncUrl(), {method:"POST", headers:{"Content-Type":"text/plain;charset=utf-8"}, body: JSON.stringify({adminCode: admin.code, ...body, window: W.id, code: code !== undefined ? code : syncCode()}), signal: ctl.signal});
+    const res = await fetch(url || syncUrl(), {method:"POST", headers:{"Content-Type":"text/plain;charset=utf-8"}, body: JSON.stringify({adminCode: admin.code, ...body, window: scopeId(), code: code !== undefined ? code : syncCode()}), signal: ctl.signal});
     let j; try { j = await res.json(); } catch(e){ throw new Error("unreadable response from the shared list"); }
     if (!j.ok){ const err = new Error(j.error || "error"); err.badCode = j.error === "bad code"; throw err; }
     return j;
@@ -578,7 +652,7 @@ async function syncCall(body, url, code){
 }
 function applyServerList(ids){
   liveList = ids.map(mk);
-  tracked = {window: W.id, ids: liveList.map(x => x.id), at: Date.now()};      // in memory only
+  tracked = {window: scopeId(), ids: liveList.map(x => x.id), at: Date.now()};      // in memory only
   sync = {state: "ok", at: Date.now()};
 }
 async function refreshShared(){
@@ -594,7 +668,7 @@ async function changeList(action, ids){            // action: "add" | "remove"
     : list.filter(x => !keys.has(x.key));
   if (mode === "test"){ testList = local(testList); renderIneligible(); return true; }
   if (!syncUrl()){
-    liveList = local(liveList); tracked = {window: W.id, ids: liveList.map(x => x.id), at: Date.now()}; store.set("tracked", tracked);
+    liveList = local(liveList); tracked = {window: scopeId(), ids: liveList.map(x => x.id), at: Date.now()}; store.set("tracked", tracked);
     renderIneligible(); return true;
   }
   try { applyServerList((await syncCall({action, ids})).ids || []); renderIneligible(); return true; }
@@ -611,17 +685,18 @@ function refreshStats(){
   const added = list.filter(x => byId.has(x.key) && !byId.get(x.key).note).length;
   const studioN = studio.filter(x => byId.has(x.key) && !byId.get(x.key).note && !hostKeys.has(x.key)).length;
   const eligible = people.filter(p => !p.note && !hostKeys.has(norm(p.id)) && !studioKeys.has(norm(p.id))).length;
+  const where = eventKind === "sat" ? "on the roster" : "in the event list";
   $("stats").innerHTML =
-    `<b>${eligible}</b> eligible of ${people.length} on the roster &middot; ${sheetIneligible.length} marked ineligible in the sheet` +
+    `<b>${eligible}</b> eligible of ${people.length} ${where} &middot; ${sheetIneligible.length} marked ineligible ${eventKind === "sat" ? "in the sheet" : "in the list"}` +
     (list.length ? ` &middot; ${added} added by hosts` : "") +
     (studio.length ? ` &middot; ${studioN} studio host${studioN === 1 ? "" : "s"} out for this draw` : "") +
-    (unknown.length ? `<br><span class="bad">Not on the roster: ${unknown.map(esc).join(", ")}</span>` : "");
+    (unknown.length ? `<br><span class="bad">Not ${where}: ${unknown.map(esc).join(", ")}</span>` : "");
   $("status").textContent = "";
   return {eligible};
 }
 function renderStudio(){
   $("studioChips").innerHTML = studio.length
-    ? studio.map(x => { const p = byId.get(x.key); return `<span class="chip${p ? "" : " unk"}" title="${p ? esc(p.name + " · " + p.team) : "Not on the roster"}">${esc(p ? p.name + " (" + x.id + ")" : x.id)}<button type="button" data-k="${esc(x.key)}" aria-label="Remove ${esc(x.id)}">×</button></span>`; }).join("")
+    ? studio.map(x => { const p = byId.get(x.key); return `<span class="chip${p ? "" : " unk"}" title="${p ? esc(p.name + " · " + p.team) : "Not on the roster"}">${esc(p && p.name && p.name !== x.id ? p.name + " (" + x.id + ")" : x.id)}<button type="button" data-k="${esc(x.key)}" aria-label="Remove ${esc(x.id)}">×</button></span>`; }).join("")
     : `<span class="hint">No studio hosts added.</span>`;
   refreshStats();
 }
@@ -640,7 +715,7 @@ function renderIneligible(){
   $("chips").innerHTML = locked
     ? `<span class="hint">${sync.state === "badcode" ? "Locked until the host code is accepted. The list is hidden." : sync.state === "idle" ? "Loading the list…" : "The list couldn't be loaded."}</span>`
     : list.length
-    ? list.map(x => { const p = byId.get(x.key); return `<span class="chip${p ? "" : " unk"}" title="${p ? esc(p.name + " · " + p.team) : "Not on the roster"}">${esc(p ? p.name + " (" + x.id + ")" : x.id)}<button type="button" data-k="${esc(x.key)}" aria-label="Remove ${esc(x.id)}">×</button></span>`; }).join("")
+    ? list.map(x => { const p = byId.get(x.key); return `<span class="chip${p ? "" : " unk"}" title="${p ? esc(p.name + " · " + p.team) : "Not on the roster"}">${esc(p && p.name && p.name !== x.id ? p.name + " (" + x.id + ")" : x.id)}<button type="button" data-k="${esc(x.key)}" aria-label="Remove ${esc(x.id)}">×</button></span>`; }).join("")
     : `<span class="hint">No IDs yet.</span>`;
   let lbl = "";
   if (mode === "test") lbl = "Test list. Not saved and not shared.";
@@ -650,7 +725,7 @@ function renderIneligible(){
   else if (sync.state === "badcode") lbl = `<span class="warn">Enter the host code to use the shared list.</span>`;
   else lbl = `<span class="bad">Can't reach the shared list${sync.err ? " (" + esc(sync.err) + ")" : ""}.</span> Live mode needs it. <button type="button" id="syncRetry">Retry</button>`;
   $("syncLbl").innerHTML = lbl;
-  $("lockBox").classList.toggle("hidden", !(mode === "live" && syncUrl() && sync.state === "badcode"));
+  $("lockBox").classList.toggle("hidden", !(syncUrl() && ((mode === "live" && sync.state === "badcode") || (eventKind === "other" && poolState === "badcode"))));
   if ($("syncRetry")) $("syncRetry").onclick = refreshShared;
   refreshStats();
 }
@@ -660,10 +735,11 @@ function renderMode(){
   document.body.classList.toggle("test", mode === "test");
   let note;
   if (mode === "test") note = "Test mode: try it out. Nothing you enter is saved or shared, and a banner shows on every screen.";
+  else if (syncUrl() && eventKind === "other") note = `Live: the ineligible list is shared with all hosts for ${poolMeta ? poolMeta.event : "this event"}. Winners stay ineligible until an admin clears the list.`;
   else if (syncUrl()) note = `Live: the ineligible list is shared with all hosts for the marathon weekend (until ${fmtET(W.end)}).`;
   else note = `Live: ineligible IDs are saved on this device for the marathon weekend (until ${fmtET(W.end)}).`;
-  if (mode === "live" && !W.active) note = note.replace(/for the marathon weekend \(until [^)]*\)/, `(it's outside the marathon weekend; the list resets ${fmtET(W.next)})`);
-  if (trackReset && mode === "live") note += " The previous weekend's list was cleared.";
+  if (mode === "live" && eventKind === "sat" && !W.active) note = note.replace(/for the marathon weekend \(until [^)]*\)/, `(it's outside the marathon weekend; the list resets ${fmtET(W.next)})`);
+  if (trackReset && mode === "live" && eventKind === "sat") note += " The previous weekend's list was cleared.";
   $("modeNote").textContent = note;
   renderIdsHint();
   renderIneligible();
@@ -709,10 +785,11 @@ async function submitCode(){
   if (!code){ $("codeMsg").innerHTML = `<span class="bad">Type the host code first.</span>`; return; }
   setHostCode(code); $("codeMsg").textContent = "Checking the code…"; $("saveCode").disabled = true;
   await refreshShared();
+  if (eventKind === "other") await fetchSharedPool(true);
   $("saveCode").disabled = false;
-  if (sync.state === "ok") fetchSharedRoster();
-  if (sync.state === "ok"){ $("codeMsg").innerHTML = `<span class="ok">✓ Code accepted. It is remembered until you close this tab.</span>`; $("syncCodeIn").value = ""; }
-  else if (sync.state === "badcode") $("codeMsg").innerHTML = `<span class="bad">That code isn't right. It's case-sensitive, so check it with whoever set up the list.</span>`;
+  const liveOk = mode !== "live" || sync.state === "ok", poolOk = eventKind !== "other" || poolState === "ok";
+  if (liveOk && poolOk){ fetchSharedRoster(); $("codeMsg").innerHTML = `<span class="ok">✓ Code accepted. It is remembered until you close this tab.</span>`; $("syncCodeIn").value = ""; }
+  else if (sync.state === "badcode" || poolState === "badcode") $("codeMsg").innerHTML = `<span class="bad">That code isn't right. It's case-sensitive, so check it with whoever set up the list.</span>`;
   else $("codeMsg").innerHTML = `<span class="bad">Couldn't reach the shared list to check the code. ${esc(sync.err || "")}</span>`;
 }
 $("saveCode").addEventListener("click", submitCode);
@@ -720,7 +797,7 @@ $("syncCodeIn").addEventListener("keydown", e => { if (e.key === "Enter"){ e.pre
 setInterval(() => {
   if (document.hidden || !syncUrl() || !$("setup").classList.contains("active")) return;
   if (mode === "live") refreshShared();
-  fetchSharedRoster();
+  fetchSharedRoster(); fetchSharedPool();
 }, 15000);
 
 $("dur").addEventListener("input", () => { $("durv").textContent = $("dur").value + "s"; store.set("dur", $("dur").value); });
@@ -730,7 +807,9 @@ $("count").addEventListener("input", () => store.set("count", $("count").value))
 document.querySelectorAll('input[name="src"]').forEach(r => r.addEventListener("change", () => store.set("src", r.value)));
 
 function renderFooter(){
-  $("rosterInfo").textContent = `Roster: ${people.length} participants · ${rosterSourceLabel()}`;
+  $("rosterInfo").textContent = eventKind === "sat"
+    ? `Roster: ${people.length} participants · ${rosterSourceLabel()}`
+    : `Event list: ${poolMeta ? `${poolPeople.length} ${poolMeta.kind === "ids" ? "WikiTree IDs" : "attendees"} · ${poolMeta.event} · published ${fmtDate(poolMeta.updated)}` : "none published yet"}`;
   $("refreshRoster").classList.toggle("hidden", !syncUrl());
 }
 
@@ -814,6 +893,105 @@ async function fetchSharedRoster(force){
   } catch(e){ return false; }
 }
 
+/* ============ other events: an event list drawn as spinning balls ============ */
+const fmtDate = iso => new Date(iso).toLocaleString("en-US", {month: "short", day: "numeric", hour: "numeric", minute: "2-digit"});
+const BRAND_COLORS = ["#FCB815", "#F37C26", "#E5EECF", "#E1F0B4", "#A5D167", "#25422D", "#FFEE99", "#FFE270", "#FAD158", "#8FC641"];   // WikiTree brand palette (black left out: it would vanish on the page)
+const toolUsable = () => eventKind === "sat" || (!!poolMeta && poolMeta.kind === "ids");   // events with non-WikiTree guests never use the Random Participant tool
+
+function shade(hex, f){ const n = parseInt(hex.slice(1), 16); return "#" + [(n >> 16) & 255, (n >> 8) & 255, n & 255].map(v => Math.round(v * f).toString(16).padStart(2, "0")).join(""); }
+let ballAngle = 0, lastBrand = "";
+function pickBrand(){ let c; do { c = BRAND_COLORS[Math.floor(Math.random() * BRAND_COLORS.length)]; } while (c === lastBrand); lastBrand = c; return c; }
+function fitLabel(){
+  const el = $("balllabel"); if (!el.clientWidth) return;
+  let size = el.clientWidth * 0.2; el.style.fontSize = size + "px";
+  for (let i = 0; i < 28 && (el.scrollHeight > el.clientHeight + 1 || el.scrollWidth > el.clientWidth + 1); i++){ size *= 0.9; el.style.fontSize = size + "px"; }
+}
+function ballHtml(label){                          // lines may break after an underscore or hyphen, never mid-word, and "name-12345" stays together
+  const wrap = s => esc(s).replace(/(_|-)/g, "$1<wbr>");
+  const m = label.match(/^(.*?)([^\s_-]+-\d+)$/);
+  return m ? wrap(m[1]) + `<span style="white-space:nowrap">${esc(m[2])}</span>` : wrap(label);
+}
+function paintBall(label, color){ const b = $("ball"); b.style.setProperty("--c1", color); b.style.setProperty("--c2", shade(color, 0.5)); b.style.setProperty("--ring", shade(color, 0.6)); $("balllabel").innerHTML = ballHtml(label); fitLabel(); }
+function spinBall(ms){                               // each step turns the ball a fixed amount over `ms`, so it slows with the draw
+  ballAngle += 150; const s = $("ballspin"); s.style.transition = `transform ${Math.max(60, ms)}ms linear`; s.style.transform = `rotate(${ballAngle}deg)`;
+}
+function setLanded(on){ $("frame").classList.toggle("landed", on); $("ballwrap").classList.toggle("landed", on); }
+function faceReset(){
+  setLanded(false); $("bib").removeAttribute("src");
+  const other = eventKind === "other"; $("frame").classList.toggle("hidden", other); $("ballwrap").classList.toggle("hidden", !other);
+  if (other) paintBall("", BRAND_COLORS[0]);
+}
+function faceShow(p, delay){ if (eventKind === "sat") $("bib").src = p.img; else { paintBall(p.id, pickBrand()); spinBall(delay); } }
+function faceLand(p){
+  if (eventKind === "sat"){ $("bib").src = p.img; $("bib").alt = `Bib ${p.bib}`; }
+  else {
+    paintBall(p.id, pickBrand());
+    ballAngle = Math.ceil(ballAngle / 360) * 360 + 360;
+    const s = $("ballspin"); s.style.transition = "transform 1100ms cubic-bezier(.2,.8,.2,1)"; s.style.transform = `rotate(${ballAngle}deg)`;
+  }
+  setLanded(true);
+}
+function cardFace(p){
+  if (eventKind === "sat") return `<img src="${esc(p.img)}" alt="Bib ${esc(p.bib)}">`;
+  let h = 0; for (const ch of p.id) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+  const c = BRAND_COLORS[h % BRAND_COLORS.length];
+  return `<div class="cardface"><div class="miniball" style="--c1:${c};--c2:${shade(c, 0.5)}"><span>${esc(p.id)}</span></div></div>`;
+}
+
+function renderEvent(){
+  const other = eventKind === "other";
+  $("evSat").setAttribute("aria-pressed", !other); $("evOther").setAttribute("aria-pressed", other);
+  let h;
+  if (!other) h = "Participants are drawn as bibs, from the participant table.";
+  else if (poolMeta && poolPeople.length) h = `${poolMeta.event}: ${poolPeople.length} ${poolMeta.kind === "ids" ? "participants' WikiTree IDs" : "attendee names"}, drawn as spinning balls. ${poolMeta.kind === "names" ? "Winners come from this list only; the WikiTree Random Participant tool isn't used. " : ""}Published ${fmtDate(poolMeta.updated)}.`;
+  else if (poolState === "badcode") h = "Enter the host code above to load the event list.";
+  else if (poolState === "offline") h = "Couldn't load the event list. Check the connection and press Refresh roster below.";
+  else h = "No event list has been published yet. An admin publishes one in the Admin view.";
+  $("evHint").textContent = h;
+  const usable = toolUsable();
+  $("srcToolRow").classList.toggle("hidden", !usable); $("toolNote").classList.toggle("hidden", !usable);
+  $("srcRosterTxt").textContent = other ? "Entire eligible list" : "Entire eligible roster";
+  if (!usable) $("srcRoster").checked = true;
+}
+function onScopeChange(){                            // each event has its own ineligible list
+  liveList = []; testList = []; tracked = {window: scopeId(), ids: [], at: null};
+  if (syncUrl()) sync = {state: "idle", at: null};
+  renderMode(); renderEvent(); refreshShared();
+}
+function setEventKind(k){
+  if (k === eventKind) return;
+  eventKind = k; store.set("eventKind", k); applyActive();
+  if (k === "other") $("srcRoster").checked = true; else if (toolOk && store.get("src") !== "roster") $("srcTool").checked = true;
+  studio = []; faceReset(); renderStudio(); renderFooter();
+  if (k === "other") fetchSharedPool(true);
+  onScopeChange();
+}
+$("evSat").addEventListener("click", () => setEventKind("sat"));
+$("evOther").addEventListener("click", () => setEventKind("other"));
+
+async function fetchSharedPool(force){
+  if (!syncUrl()){ renderEvent(); return false; }
+  try{
+    const j = await syncCall({action: "getPool", since: !force && poolMeta ? (poolMeta.updated || "") : ""});
+    poolState = "ok";
+    if (j.unchanged){ renderEvent(); renderIneligible(); return false; }
+    if (!j.rows){                                      // nothing published, or an admin removed it
+      const had = !!poolMeta; poolMeta = null; poolPeople = [];
+      if (eventKind === "other"){ applyActive(); if (had) onScopeChange(); }
+      renderEvent(); renderIneligible(); renderFooter(); return had;
+    }
+    const was = poolMeta, meta = {kind: j.kind, event: j.event, updated: j.updated};
+    setPool(j.rows, meta);
+    renderEvent(); renderIneligible(); renderFooter();
+    if (eventKind === "other" && (!was || was.event !== meta.event)) onScopeChange();
+    return true;
+  } catch(e){ poolState = e.badCode ? "badcode" : "offline"; renderEvent(); renderIneligible(); return false; }
+}
+function loadLocalPool(){                            // only used when there is no shared service
+  const s = store.get("poolLocal"); if (!s || !s.rows) return;
+  setPool(s.rows, s.meta); poolState = "ok";
+}
+
 /* ============ WikiTree random participant tool ============ */
 function toolUrlOk(u){ try { const x = new URL(u); return x.protocol === "https:" && x.hostname === "plus.wikitree.com"; } catch(e){ return false; } }
 async function fetchRandomId(url){
@@ -837,7 +1015,7 @@ async function probeTool(){
   try{
     await fetchRandomId(toolUrl());
     toolOk = true; $("srcTool").disabled = false;
-    if (store.get("src") === "roster") $("srcRoster").checked = true; else $("srcTool").checked = true;
+    if (eventKind === "sat"){ if (store.get("src") === "roster") $("srcRoster").checked = true; else $("srcTool").checked = true; }
     $("toolNote").textContent = "✓ Connected to the WikiTree random participant tool.";
   } catch(e){
     toolOk = false; $("srcTool").disabled = true; $("srcRoster").checked = true;
@@ -863,12 +1041,22 @@ async function pickWinner(){
     if (!p){ notOnRoster++; continue; }
     if (isEligible(p)) return p;
   }
-  throw new Error("The tool has no more eligible participants in its time window." + (notOnRoster ? ` (${notOnRoster} people it returned aren't on the roster; update the roster in Admin.)` : ""));
+  throw new Error("The tool has no more eligible participants in its time window." + (notOnRoster ? ` (${notOnRoster} people it returned aren't ${eventKind === "sat" ? "on the roster; update the roster" : "in the event list; publish an updated list"} in Admin.)` : ""));
 }
 
 /* ============ setup -> ready ============ */
 $("toReady").addEventListener("click", async () => {
   Sound.unlock();
+  if (eventKind === "other"){
+    if (syncUrl()) await fetchSharedPool();
+    if (!poolPeople.length){
+      $("status").innerHTML = poolState === "badcode" ? `<span class="bad">Enter the host code first. The event list is loaded with it.</span>`
+        : poolState === "offline" ? `<span class="bad">Couldn't load the event list. Check the connection and press Refresh roster below.</span>`
+        : `<span class="bad">No event list has been published yet. An admin publishes one in the Admin view.</span>`;
+      if (poolState === "badcode") $("syncCodeIn").focus();
+      return;
+    }
+  }
   if (mode === "live" && syncUrl()){
     await refreshShared();
     if (sync.state !== "ok"){
@@ -882,10 +1070,10 @@ $("toReady").addEventListener("click", async () => {
   const {eligible} = refreshStats();
   const count = parseInt($("count").value, 10);
   if (!(count >= 1)){ $("status").innerHTML = `<span class="bad">Enter how many winners to draw (at least 1).</span>`; $("count").focus(); return; }
-  if (count > eligible){ $("status").innerHTML = `<span class="bad">Only ${eligible} participants are eligible, so ${count} winners can't be drawn.</span>`; return; }
-  cfg = {count, url: toolUrl(), source: toolOk && $("srcTool").checked ? "tool" : "roster", dur: +$("dur").value};
+  if (count > eligible){ $("status").innerHTML = `<span class="bad">Only ${eligible} ${eventKind === "sat" ? "participants" : "people"} are eligible, so ${count} winners can't be drawn.</span>`; return; }
+  cfg = {count, url: toolUrl(), source: toolOk && toolUsable() && $("srcTool").checked ? "tool" : "roster", dur: +$("dur").value};
   $("countLbl").textContent = count === 1 ? "1 winner will be drawn" : `${count} winners will be drawn`;
-  $("srcLbl").textContent = cfg.source === "tool" ? "From the WikiTree random participant tool." : "From the whole eligible roster.";
+  $("srcLbl").textContent = cfg.source === "tool" ? "From the WikiTree random participant tool." : eventKind === "sat" ? "From the whole eligible roster." : "From the whole eligible list.";
   show("ready"); $("drawBtn").focus();
 });
 $("backToSetup").addEventListener("click", () => show("setup"));
@@ -893,37 +1081,48 @@ $("drawBtn").addEventListener("click", startDraw);
 
 /* ============ stage ============ */
 function randPerson(except){
-  let pool = people.filter(p => loaded.has(p.img));
+  let pool = eventKind === "sat" ? people.filter(p => loaded.has(p.img)) : people;
   if (pool.length < 8) pool = people;
   let p; do { p = pool[Math.floor(Math.random()*pool.length)]; } while (p === except && pool.length > 1);
   return p;
 }
 async function spin(pickP, seconds, id){
-  const frame = $("frame"), bib = $("bib");
-  frame.classList.remove("landed");
+  setLanded(false);
   const total = seconds*1000, start = performance.now();
   let last = null;
   while (performance.now()-start < total){
     const t = (performance.now()-start)/total;
-    last = randPerson(last); bib.src = last.img;
-    await sleep(70 + 650 * Math.pow(t, 3));
+    const delay = 70 + 650 * Math.pow(t, 3);
+    last = randPerson(last); faceShow(last, delay);
+    await sleep(delay);
     if (id !== runId) return null;
   }
   let settled = false; pickP.then(() => settled = true); await sleep(0);
-  while (!settled){ if (id !== runId) return null; last = randPerson(last); bib.src = last.img; await sleep(700); }
+  while (!settled){ if (id !== runId) return null; last = randPerson(last); faceShow(last, 700); await sleep(700); }
   const r = await pickP;
   if (id !== runId) return null;
-  if (r.v){ await ensureLoaded(r.v.img); if (id !== runId) return null; bib.src = r.v.img; bib.alt = `Bib ${r.v.bib}`; frame.classList.add("landed"); Sound.landed(); }
+  if (r.v){ if (eventKind === "sat"){ await ensureLoaded(r.v.img); if (id !== runId) return null; } faceLand(r.v); Sound.landed(); }
   return r;
 }
 let shownId = "";
 function showWinner(p, label){
   shownId = p.id;
+  const link = `<a href="https://www.wikitree.com/wiki/${encodeURIComponent(p.id)}" target="_blank" rel="noopener">${esc(p.id)}</a>`;
+  let head, lines = "";
+  if (eventKind === "sat"){
+    head = p.name;
+    lines = `<div class="meta"><b>WikiTree ID:</b> ${link}</div><div class="meta"><b>Team:</b> ${esc(p.team)} &middot; <b>Bib</b> #${esc(p.bib)}</div>`;
+  } else if (poolMeta && poolMeta.kind === "ids"){
+    head = p.hasName ? p.name : p.id;
+    lines = (p.hasName ? `<div class="meta"><b>WikiTree ID:</b> ${link}</div>` : `<div class="meta">${link} on WikiTree</div>`) + (p.team ? `<div class="meta"><b>Team:</b> ${esc(p.team)}</div>` : "");
+  } else {
+    head = p.name;
+    lines = p.team ? `<div class="meta"><b>Team:</b> ${esc(p.team)}</div>` : "";
+  }
   $("result").innerHTML = `<div class="fadein">
     <div class="round">${esc(label)}</div>
-    <div class="winner">${esc(p.name)}</div>
-    <div class="meta"><b>WikiTree ID:</b> <a href="https://www.wikitree.com/wiki/${encodeURIComponent(p.id)}" target="_blank" rel="noopener">${esc(p.id)}</a></div>
-    <div class="meta"><b>Team:</b> ${esc(p.team)} &middot; <b>Bib</b> #${esc(p.bib)}</div>
+    <div class="winner">${esc(head)}</div>
+    ${lines}
   </div>`;
 }
 const setActions = html => $("actions").innerHTML = html;
@@ -938,7 +1137,7 @@ async function startDraw(){
   const myRun = ++runId;
   drawn = []; drawnSet = new Set();
   $("summary").classList.add("hidden"); $("spinView").classList.remove("hidden");
-  $("frame").classList.remove("landed"); $("bib").removeAttribute("src");
+  faceReset();
   setActions(""); $("result").innerHTML = "";
   show("stage");
   await sleep(400);
@@ -987,37 +1186,87 @@ async function startDraw(){
   }
 }
 function openSummary(){
-  $("wlist").innerHTML = drawn.map(p => `<div class="wcard"><img src="${esc(p.img)}" alt="Bib ${esc(p.bib)}"><div><strong>${esc(p.name)}</strong><span>${esc(p.id)}<br>${esc(p.team)}</span></div></div>`).join("");
+  $("wlist").innerHTML = drawn.map(p => `<div class="wcard">${cardFace(p)}<div><strong>${esc(p.name)}</strong><span>${p.name === p.id ? "" : esc(p.id) + "<br>"}${esc(p.team)}</span></div></div>`).join("");
   $("spinView").classList.add("hidden"); $("summary").classList.remove("hidden");
 }
 $("backToStage").addEventListener("click", () => { $("summary").classList.add("hidden"); $("spinView").classList.remove("hidden"); });
 /* ---------- prize winners screen: WikiTree markup for the Current Event Winners table ---------- */
 const NAME_PARTICLES = new Set(["van","von","der","den","de","del","della","di","da","du","la","le","los","las","el","al","bin","ibn","ten","ter","op","af","zu","st","st.","ó","ni","ní","nic"]);
+const NAME_SUFFIXES = new Set(["jr","jr.","sr","sr.","ii","iii","iv"]);
 function splitName(full){                         // "Esmé van der Westhuizen" -> ["Esmé", "van der Westhuizen"]
   const parts = String(full).trim().split(/\s+/).filter(Boolean);
   if (parts.length <= 1) return [parts[0] || "", ""];
   let i = parts.length - 1;
+  if (i > 1 && NAME_SUFFIXES.has(parts[i].toLowerCase().replace(/,/g, ""))) i--;       // keep Jr., III and the like with the surname
   while (i > 1 && NAME_PARTICLES.has(parts[i-1].toLowerCase())) i--;
   return [parts.slice(0, i).join(" "), parts.slice(i).join(" ")];
 }
 let prizeFmt = "rows";
-function prizeMarkup(){
-  const ev = $("eventName").value.trim() || "SaTXI";
-  const rows = drawn.map(p => { const [first, last] = splitName(p.name); return `|-\n|${p.id}||${first}||${last}||${ev}`; }).join("\n");
-  if (prizeFmt === "rows") return rows;
-  return `=== Current Event Winners ===\n\n{| border="1" class="wikitable sortable"\n!WikiTree ID!!First!!Last!!Event\n${rows}\n|-\n|}`;
+function rowFor(p, ev){                            // one row of the Current Event Winners table
+  const withIds = eventKind === "sat" || (!!poolMeta && poolMeta.kind === "ids");
+  const known = !!p.name && (eventKind === "sat" || p.hasName);
+  const [first, last] = known ? splitName(p.name) : ["", ""];
+  return `|-\n|${(withIds ? p.id : "") || " "}||${first}||${last}||${ev}`;
 }
+const personFor = id => byId.get(norm(id)) || {id, name: "", hasName: false, team: ""};
+function allWinners(){                             // everyone on this event's shared list (the winners recorded so far, oldest first), then this draw
+  const seen = new Set(), out = [];
+  const add = id => { const k = norm(id); if (!seen.has(k)){ seen.add(k); out.push(personFor(id)); } };
+  curList().forEach(x => add(x.id)); drawn.forEach(p => add(p.id));
+  return out;
+}
+const rowKey = p => (eventKind === "sat" || (poolMeta && poolMeta.kind === "ids")) ? norm(p.id) : norm(p.name);
+function keysInTable(text){                        // who is already in a pasted WikiTree table
+  const keys = new Set();
+  text.split(/\r?\n/).forEach(line => {
+    if (!/^\|[^-}+]/.test(line)) return;
+    const c = line.slice(1).split("||").map(s => s.trim());
+    const k = c[0] ? norm(c[0]) : norm(((c[1] || "") + " " + (c[2] || "")).trim());
+    if (k) keys.add(k);
+  });
+  return keys;
+}
+let wholeNote = "";
+function wholeTable(ev){
+  const people = allWinners(), existing = $("existingTable").value.trim();
+  if (existing && /^\s*\|\}\s*$/m.test(existing)){
+    const have = keysInTable(existing), missing = people.filter(p => !have.has(rowKey(p)));
+    wholeNote = missing.length ? `Your pasted table, with ${missing.length} winner${missing.length === 1 ? "" : "s"} it was missing added before the closing |}.` : "Everyone is already in your pasted table, so nothing was added.";
+    if (!missing.length) return existing;
+    const lines = existing.split(/\r?\n/); let at = lines.length - 1;
+    while (at >= 0 && !/^\s*\|\}\s*$/.test(lines[at])) at--;
+    if (at > 0 && /^\s*\|-\s*$/.test(lines[at - 1])) at--;     // keep the table's trailing |- row last
+    lines.splice(at, 0, ...missing.map(p => rowFor(p, ev)).join("\n").split("\n"));
+    return lines.join("\n");
+  }
+  wholeNote = existing ? "That doesn't look like a WikiTree table (no closing |}), so a new table was built instead. " : "";
+  wholeNote += `${people.length} row${people.length === 1 ? "" : "s"}: everyone on this event's ineligible list, in the order they were added, plus this draw's winners.`;
+  return `=== Current Event Winners ===\n\n{| border="1" class="wikitable sortable"\n!WikiTree ID!!First!!Last!!Event\n${people.map(p => rowFor(p, ev)).join("\n")}\n|-\n|}`;
+}
+function prizeMarkup(){
+  const ev = $("eventName").value.trim() || defaultEvent();
+  if (prizeFmt === "rows") return drawn.map(p => rowFor(p, ev)).join("\n");
+  return wholeTable(ev);
+}
+const defaultEvent = () => eventKind === "sat" ? (store.get("eventName") || "SaTXI") : (poolMeta ? poolMeta.event : "");
 function renderPrizes(){
   $("fmtRows").setAttribute("aria-pressed", prizeFmt === "rows"); $("fmtTable").setAttribute("aria-pressed", prizeFmt === "table");
   $("fmtHint").textContent = prizeFmt === "rows"
     ? "Paste these rows into the existing table, just above its last line (the |} that closes the table)."
-    : "A complete Current Event Winners section containing only this draw's winners.";
+    : "";
+  if (eventKind === "other" && poolMeta && (poolMeta.kind === "names" || drawn.some(p => !p.hasName))) $("fmtHint").textContent += poolMeta.kind === "names" ? " Attendees who aren't on WikiTree have an empty ID cell. Fill it in, or delete those rows, before you paste." : " Winners without a name on WikiTree have empty First and Last cells.";
+  $("existingBox").classList.toggle("hidden", prizeFmt !== "table");
   $("prizeOut").value = prizeMarkup(); $("copyMsg").textContent = "";
+  if (prizeFmt === "table") $("fmtHint").textContent = wholeNote;
 }
-function openPrizes(){ $("eventName").value = store.get("eventName") || "SaTXI"; renderPrizes(); show("prizes"); }
+async function openPrizes(){
+  if (mode === "live" && syncUrl()) await refreshShared();         // pick up winners drawn on other hosts' screens
+  $("eventName").value = defaultEvent(); renderPrizes(); show("prizes");
+}
 $("fmtRows").addEventListener("click", () => { prizeFmt = "rows"; renderPrizes(); });
+$("existingTable").addEventListener("input", renderPrizes);
 $("fmtTable").addEventListener("click", () => { prizeFmt = "table"; renderPrizes(); });
-$("eventName").addEventListener("input", () => { store.set("eventName", $("eventName").value.trim()); renderPrizes(); });
+$("eventName").addEventListener("input", () => { if (eventKind === "sat") store.set("eventName", $("eventName").value.trim()); renderPrizes(); });
 $("copyPrize").addEventListener("click", async () => {
   const box = $("prizeOut"); box.focus(); box.select();
   try { await navigator.clipboard.writeText(box.value); $("copyMsg").innerHTML = `<span class="ok">✓ Copied.</span>`; }
@@ -1038,7 +1287,7 @@ document.addEventListener("keydown", e => {
 
 $("refreshRoster").addEventListener("click", async () => {
   const b = $("refreshRoster"); b.textContent = "Refreshing…";
-  const changed = await fetchSharedRoster(true);
+  const changed = eventKind === "other" ? await fetchSharedPool(true) : await fetchSharedRoster(true);
   b.textContent = changed ? "Updated ✓" : "Up to date ✓";
   setTimeout(() => b.textContent = "Refresh roster", 2500);
 });
@@ -1067,11 +1316,17 @@ function renderAdmin(){
   if (!renderAdminLock()) return;
   $("toolUrl").value = toolUrl();
   $("rosterStats").innerHTML = rosterSummary();
+  $("poolStats").innerHTML = poolStatsHtml();
+  renderPoolKind();
   $("syncUrlIn").value = store.get("syncUrl") || SYNC_DEFAULT;
   $("syncCodeAdm").value = syncCode();
   const n = liveList.length;
   const shareLbl = !syncUrl() ? '<span class="warn">Not shared: saved on this device only</span>' : sync.state === "ok" ? '<span class="ok">Shared with all hosts</span>' : '<span class="bad">Shared list not reachable</span>';
   $("trackInfo").innerHTML = `Window: ${fmtET(W.start)} to ${fmtET(W.end)} &middot; ${W.active ? '<span class="ok">in progress</span>' : '<span class="warn">ended; resets ' + fmtET(W.next) + '</span>'}<br>${shareLbl} &middot; <b>${n}</b> ID${n===1?"":"s"} on the list${tracked.at ? ", last synced or changed " + new Date(tracked.at).toLocaleString("en-US",{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"}) : ""}`;
+}
+function poolStatsHtml(){
+  return poolMeta ? `<b>${poolPeople.length}</b> ${poolMeta.kind === "ids" ? "WikiTree IDs" : "attendee names"} &middot; ${esc(poolMeta.event)} &middot; published ${fmtDate(poolMeta.updated)}`
+                  : "No event list is published.";
 }
 const say = (id, html, cls) => { $(id).innerHTML = cls ? `<span class="${cls}">${html}</span>` : html; };
 
@@ -1179,17 +1434,87 @@ $("forgetSync").addEventListener("click", () => { store.del("syncUrl"); setHostC
 confirmTwice($("clearTracked"), "Clear the ineligible list", async () => {
   try{
     if (syncUrl()) applyServerList((await syncCall({action:"clear"})).ids || []);
-    else { liveList = []; tracked = {window: W.id, ids: [], at: Date.now()}; store.set("tracked", tracked); }
+    else { liveList = []; tracked = {window: scopeId(), ids: [], at: Date.now()}; store.set("tracked", tracked); }
     say("trackStatus", "The ineligible list is cleared.", "ok");
   } catch(e){ say("trackStatus", adminProblem(e), "bad"); }
   renderAdmin(); renderIneligible();
 });
 confirmTwice($("resetAll"), "Reset this browser", () => {
-  ["tracked","toolUrl","roster","rosterMeta","sheetUrl","sheetTab","syncUrl","dur","count","src","autoAdd"].forEach(store.del); setHostCode("");
-  tracked = {window: W.id, ids: [], at: null}; store.set("tracked", tracked); liveList = []; testList = [];
+  ["tracked","toolUrl","roster","rosterMeta","sheetUrl","sheetTab","syncUrl","dur","count","src","autoAdd"].forEach(store.del); setHostCode(""); store.del("eventKind"); store.del("poolLocal"); if (eventKind !== "sat"){ eventKind = "sat"; applyActive(); faceReset(); }
+  tracked = {window: scopeId(), ids: [], at: null}; store.set("tracked", tracked); liveList = []; testList = [];
   sync = {state: syncUrl() ? "idle" : "off", at: null};
   setRoster(BUILTIN.map(a => toPerson(...a))); autoAdd = true; renderMode(); renderWinToggle(); renderAdmin(); renderFooter(); probeTool(); refreshShared();
   say("trackStatus", "This browser is back to its defaults. The shared list was not changed.", "ok");
+});
+
+/* ---- event list (other events): WikiTree IDs or attendee names, only with the admin passcode ---- */
+let poolKindSel = "ids", poolPending = null;
+function renderPoolKind(){
+  $("pkIds").setAttribute("aria-pressed", poolKindSel === "ids"); $("pkNames").setAttribute("aria-pressed", poolKindSel === "names");
+  $("poolHint").textContent = poolKindSel === "ids"
+    ? "One WikiTree ID per line (wikitree.com/wiki/... links work too). If you have a name, add it after a comma, like Smith-123, Jane Smith. For IDs without a name, the names are looked up on WikiTree when you publish."
+    : "One attendee name per line. These guests aren't on WikiTree, so winners come only from this list and the WikiTree Random Participant tool isn't used.";
+  $("poolText").placeholder = poolKindSel === "ids" ? "Smith-123\nJones-456, Pat Jones" : "Jane Doe\nSam Rivers";
+}
+function parsePoolText(text, kind){
+  const rows = [], seen = new Set(); let dupes = 0, header = false;
+  text.split(/\r?\n/).forEach(line => {
+    line = line.trim(); if (!line) return;
+    let value, name = "";
+    if (kind === "ids"){
+      const parts = line.split(/[,\t]/).map(s => s.trim());
+      value = parts[0]; name = parts.slice(1).join(" ").trim();
+      const m = value.match(/wikitree\.com\/(?:wiki|genealogy\/[^\/]+)\/([^\s?#\/]+)/i); if (m) value = decodeURIComponent(m[1]);
+      value = value.replace(/\s+/g, "_");
+      if (rows.length === 0 && !header && /^(wikitree_?id|id|name|value)$/i.test(value)){ header = true; return; }
+    } else {
+      value = line.replace(/\s+/g, " ");
+      if (rows.length === 0 && !header && /^(names?|attendees?)$/i.test(value)){ header = true; return; }
+    }
+    if (!value) return;
+    const k = norm(value);
+    if (seen.has(k)){ dupes++; return; }
+    seen.add(k); rows.push([value, name, "", ""]);
+  });
+  return {rows, dupes};
+}
+$("pkIds").addEventListener("click", () => { poolKindSel = "ids"; renderPoolKind(); });
+$("pkNames").addEventListener("click", () => { poolKindSel = "names"; renderPoolKind(); });
+$("poolFile").addEventListener("change", async e => { const f = e.target.files[0]; if (f){ $("poolText").value = await f.text(); say("poolStatus", `Read ${esc(f.name)}. Press "Read this list" to check it.`); } });
+$("readPool").addEventListener("click", () => {
+  const event = $("poolEvent").value.trim();
+  if (!event) return say("poolStatus", "Enter the event name first.", "bad");
+  const r = parsePoolText($("poolText").value, poolKindSel);
+  if (!r.rows.length){ poolPending = null; $("poolPending").classList.add("hidden"); return say("poolStatus", "No entries found. Add one per line.", "bad"); }
+  poolPending = {kind: poolKindSel, event, rows: r.rows};
+  $("poolPendingText").innerHTML = `Ready to publish <b>${esc(event)}</b>: <b>${r.rows.length}</b> ${poolKindSel === "ids" ? "WikiTree IDs" : "attendee names"}${r.dupes ? `, ${r.dupes} duplicate${r.dupes === 1 ? "" : "s"} skipped` : ""}.`;
+  $("poolPending").classList.remove("hidden"); say("poolStatus", "");
+});
+$("discardPool").addEventListener("click", () => { poolPending = null; $("poolPending").classList.add("hidden"); });
+$("publishPool").addEventListener("click", async () => {
+  if (!poolPending) return;
+  const pp = poolPending; say("poolStatus", pp.kind === "ids" ? "Publishing, and looking up names on WikiTree…" : "Publishing…"); $("publishPool").disabled = true;
+  try{
+    if (syncUrl()){
+      const j = await syncCall({action: "setPool", kind: pp.kind, event: pp.event, rows: pp.rows});
+      await fetchSharedPool(true);
+      const lack = pp.kind === "ids" ? pp.rows.filter(r => !r[1]).length : 0;
+      say("poolStatus", `✓ Published ${j.count} ${pp.kind === "ids" ? "WikiTree IDs" : "attendee names"} for ${esc(j.event)}. Every host picks it up within about 15 seconds.` + (pp.kind === "ids" && lack ? ` Names were found on WikiTree for ${j.enriched} of the ${lack} IDs that came without one.` : ""), "ok");
+    } else {
+      const meta = {kind: pp.kind, event: pp.event, updated: new Date().toISOString()};
+      store.set("poolLocal", {rows: pp.rows, meta}); setPool(pp.rows, meta); poolState = "ok"; onScopeChange();
+      say("poolStatus", `✓ Loaded ${pp.rows.length} entries on this browser.`, "ok");
+    }
+    poolPending = null; $("poolPending").classList.add("hidden"); renderAdmin(); renderFooter(); renderEvent();
+  } catch(e){ say("poolStatus", adminProblem(e), "bad"); }
+  $("publishPool").disabled = false;
+});
+confirmTwice($("clearPoolBtn"), "Remove the event list for everyone", async () => {
+  try{
+    if (syncUrl()){ await syncCall({action: "clearPool"}); await fetchSharedPool(true); }
+    else { store.del("poolLocal"); poolMeta = null; poolPeople = []; applyActive(); renderEvent(); renderFooter(); }
+    say("poolStatus", "The event list is removed.", "ok"); renderAdmin();
+  } catch(e){ say("poolStatus", adminProblem(e), "bad"); }
 });
 
 /* ============ routing & start ============ */
@@ -1200,8 +1525,8 @@ function route(){
 window.addEventListener("hashchange", route);
 $("backToDraw").addEventListener("click", e => { e.preventDefault(); history.replaceState(null, "", location.pathname + location.search); route(); });
 
-loadRoster(); renderMode(); renderWinToggle(); renderFooter(); probeTool(); route();
-refreshShared(); fetchSharedRoster(); renderStudio();
+loadRoster(); if (!syncUrl()) loadLocalPool(); applyActive(); faceReset(); renderMode(); renderWinToggle(); renderEvent(); renderFooter(); probeTool(); route();
+refreshShared(); fetchSharedRoster(); if (syncUrl()) fetchSharedPool(true); renderStudio();
 </script>
 </body>
 </html>
