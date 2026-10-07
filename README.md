@@ -1,7 +1,7 @@
-[README.md](https://github.com/user-attachments/files/33006002/README.md)
+[README.md](https://github.com/user-attachments/files/33176000/README.md)
 # WikiTree Marathon Drawing
 
-A live-drawing tool for the WikiTree Source-a-Thon livecast. The host pulls winners from WikiTree's Random Participant tool, and the page shows a bib slideshow that slows down and lands on each winner, with a drum roll while it spins and applause when the winner lands. It shows the winner's name, WikiTree ID, team and bib.
+A live-drawing tool for WikiTree livecasts. For the Source-a-Thon marathon, the host pulls winners from WikiTree's Random Participant tool, and the page shows a bib slideshow that slows down and lands on each winner. For any other WikiTree event, such as the Connect-a-Thon, it draws from a list of WikiTree IDs or attendee names and shows spinning balls in WikiTree colors instead of bibs. Either way there's a drum roll while it spins and applause when the winner lands.
 
 **Live page:** https://robinson27225.github.io/WikiTreeMarathonDrawing/
 
@@ -26,6 +26,25 @@ The tool has three screens.
 
 A small **Sound on / Sound off** button in the bottom-right corner mutes everything quickly.
 
+## Other events: balls instead of bibs
+
+At the top of the setup screen, **What are we drawing for?** switches between:
+
+- **Source-a-Thon marathon (bibs)**: everything described above, with the participant table and bib images.
+- **Other event (balls)**: for the Connect-a-Thon or any other WikiTree event. Instead of bibs, a ball spins and changes color at random through the WikiTree brand palette (`#FCB815`, `#F37C26`, `#E5EECF`, `#E1F0B4`, `#A5D167`, `#25422D`, `#FFEE99`, `#FFE270`, `#FAD158` and `#8FC641`; black is left out because it would vanish on the page). Each ball carries one entry from the event's list, slows down with the draw, and lands on the winner. The drum roll, applause, studio hosts, ineligible list, host code, and the prize winners screen all work the same way.
+
+An admin publishes the **event list** for the event (see Admin view). It is one of two kinds:
+
+1. **Participants' WikiTree IDs.** The balls show WikiTree IDs, and the winner screen shows the person's name when it is known, with their ID linked to their profile. The WikiTree Random Participant tool is available as an option, but the default is the whole list.
+2. **Attendee names**, for events with guests who are not on WikiTree. The balls show names, and winners come from the list only. The Random Participant tool is not used for these events and is hidden.
+
+Other things to know:
+
+- Each event name has its **own ineligible list**, shared by all hosts. A new event name starts fresh, and the marathon's weekend list is separate and unaffected. The list stays until an admin clears it.
+- With **Add winners automatically** on, winners are added to the event's list as they land, as in the marathon.
+- On the prize winners screen, the Event column defaults to the event name. Attendees without a WikiTree ID get an empty ID cell, and WikiTree IDs without a known name get empty First and Last cells. Fill those in before you paste.
+- The event list is protected by the host code like the ineligible list. A new tab asks for the code before it shows the list.
+
 ## After the draw: the prize winners screen
 
 When the draw is finished, press **Prize winners table**. It opens a screen with:
@@ -38,7 +57,9 @@ When the draw is finished, press **Prize winners table**. It opens a screen with
   |Zurcher-160||Randi||Zurcher||SaTXI
   ```
 
-- **Rows to add** (the default) gives just the rows. Paste them into the existing table on the Prize Winners page, just above the last line (the `|}` that closes the table). **Whole table** gives a complete Current Event Winners section containing only this draw's winners.
+- **Rows to add** (the default) gives just this draw's rows. Paste them into the existing table on the Prize Winners page, just above the last line (the `|}` that closes the table).
+- **Whole table** gives the complete Current Event Winners section: **everyone on this event's ineligible list, in the order they were added, plus this draw's winners**. The ineligible list is where winners are recorded, so this includes winners from earlier draws and from other hosts' screens. The page re-reads the shared list when the prize screen opens, so it is up to date. It also includes anyone a host added to the list by hand, so remove any entries that weren't winners before you copy.
+- **Already have the table on WikiTree?** WikiTree doesn't let the page read its own page, so the tool can't see rows that were added before it started recording winners. Open **Already have the table on WikiTree? Paste it to add to it** under the buttons and paste the whole Current Event Winners section from the edit box. The tool keeps your rows exactly as they are and adds only the winners that aren't in it yet, just before the closing `|}`.
 - An **Event name** box (it starts as SaTXI and is remembered in the browser) fills the Event column. Change it for each marathon.
 - The markup box is editable. First and Last are split from the participant's name automatically, keeping prefixes such as "van der" with the surname. Check them, and fix any by hand, before copying.
 
@@ -96,8 +117,8 @@ The script uses two different passcodes. They must not be the same.
 
 | Code | Who has it | What it allows |
 | --- | --- | --- |
-| **Host code** (`PASSCODE`) | Everyone drawing | Read and edit the ineligible list (including the winners added automatically), and load the participant table. Remembered only until the tab is closed. |
-| **Admin code** (`ADMIN_PASSCODE`) | Only the person managing the participant table | Everything above, plus publishing or removing the participant table and clearing the whole ineligible list. |
+| **Host code** (`PASSCODE`) | Everyone drawing | Read and edit the ineligible list (including the winners added automatically), and load the participant table and event list. Remembered only until the tab is closed. |
+| **Admin code** (`ADMIN_PASSCODE`) | Only the person managing the participant table | Everything above, plus publishing or removing the participant table or the event list, and clearing the whole ineligible list. |
 
 Both codes are checked by the Google script, not by the page, so neither appears in the page's source. Admin actions are refused until an admin code is set.
 
@@ -112,8 +133,16 @@ So a change to the participant table reaches the hosts only when someone with th
 Add `#admin` to the end of the page address (the page has no link to it). It asks for the admin code before showing anything, and it locks again when you leave the view or press **Lock admin**. The code is held only in memory.
 
 - **Participant table:** press **Publish from the spreadsheet** to publish the participants tab of the sheet (it finds the tab automatically, or type its name). Or paste or upload a CSV, check the summary, and press **Publish to all hosts**. **Back to the built-in table for everyone** removes the published table.
+- **Event list (other events):** enter the event name, choose whether the list holds WikiTree IDs or attendee names, then paste or upload the list (one entry per line) and press **Read this list**. Check the summary and press **Publish to all hosts**. For WikiTree IDs, you can add a name after a comma (`Smith-123, Jane Smith`). For IDs that come without a name, the script looks the names up on WikiTree when you publish, as a best effort. If WikiTree is slow or limits requests, the list is still published with IDs only. **Remove the event list for everyone** takes it down.
 - **Random participant tool:** enter the marathon's tool URL (it must start with `https://plus.wikitree.com/`, and should include the challenge name and hours) and test it. This setting is saved in the browser you use.
 - **Ineligible list:** see the weekend window, test or change the shared list connection, or clear the list for everyone.
+
+## Setting up a new event (balls)
+
+1. Open the page with `#admin`, enter the admin code, and find **Event list (other events)**.
+2. Enter the event name, choose **WikiTree IDs** or **Attendee names**, paste the list, press **Read this list**, then **Publish to all hosts**.
+3. On the setup screen, choose **Other event (balls)**. Check that the line under it names your event and shows the right count, then do a practice draw in Test mode.
+4. When the next event comes, publish a new list with a new event name. The old list's ineligible entries stay on the sheet and do not carry over.
 
 ## Setting up for a new marathon
 
@@ -130,6 +159,7 @@ The table built into `index.html` is a snapshot (Oct 2, 2026, 602 participants).
 2. Replace the sample code with the contents of `ineligible-sync.gs`.
 3. Set `PASSCODE` (host code) and `ADMIN_PASSCODE` (admin code) near the top, using two different words.
 4. Choose **Deploy, then New deployment, then Web app**. Set **Execute as** to **Me** and **Who has access** to **Anyone**, then **Deploy** and authorize it.
+   The script can look up names on WikiTree when you publish an ID list, so Google asks you to approve a permission to "connect to an external service". That is only used for that lookup.
 5. Copy the **Web app URL**. It is built into `index.html` (the `SYNC_DEFAULT` value), or an admin can paste it in the Admin view.
 6. After any later change to the script, use **Deploy, Manage deployments, pencil icon, Version: New version, Deploy**. The URL stays the same.
 
@@ -162,6 +192,7 @@ This repository and page are public, so set both codes. Without them anyone who 
 | Admin says the admin passcode must differ from the host code | Change one of the two codes in the script and deploy a new version. |
 | "That passcode isn't right" in Admin | The admin code is case-sensitive. Check it with whoever set up the script. |
 | The participant table did not change on a host's screen | Press **Refresh roster** at the bottom of the setup screen, or wait about 15 seconds. Make sure someone published it from the Admin view. |
+| "No event list has been published yet" | Choose **Other event** only after an admin has published a list in the Admin view. Press **Refresh roster** at the bottom if it was just published. |
 | Tool shows as not reachable | Press **Check again** under Draw settings, or confirm the URL in the Admin view. Use the whole-roster option only as a fallback. |
 | A winner's bib does not appear | The participant table may be missing that person. Update the sheet and publish it again. |
 | No sound | Press **Sound check**, make sure the corner button says "Sound on", and check the computer's volume. |
